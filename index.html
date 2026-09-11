@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f3f4ef">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="任務計畫">
+  <title>今天也前進一點點</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/app-icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="design.css">
+</head>
+<body>
+  <main class="page-shell">
+    <header class="planner-masthead">
+      <div class="planner-brand"><span class="brand-mark" aria-hidden="true">✦</span><div><p>DAILY PROGRESS</p><h1>任務計畫</h1></div></div>
+    <div class="primogem-toolbar">
+      <div class="primogem-wallet" aria-label="原石餘額">
+        <span class="primogem-icon" aria-hidden="true"></span>
+        <span class="primogem-count" id="primogemCount" aria-live="polite" aria-atomic="true">0</span>
+        <button class="primogem-help" id="primogemHelp" type="button" aria-label="查看原石取得方式" aria-expanded="false" aria-controls="primogemHelpText">+</button>
+      </div>
+      <p class="primogem-help-text" id="primogemHelpText" hidden>完成任何任務，即可獲得 20 原石。原石會自動累積儲存。</p>
+    </div>
+    </header>
+    <div class="primogem-notice" id="primogemNotice" role="status" hidden></div>
+    <div class="cloud-toolbar" aria-label="雲端帳號">
+      <span class="cloud-status" id="cloudStatus">尚未登入</span>
+      <button class="cloud-button login-button" id="openLogin" type="button">登入</button>
+      <button class="cloud-button save-cloud-button" id="saveToCloud" type="button" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 18h10a4 4 0 0 0 .5-8A6 6 0 0 0 6 8.5 4.8 4.8 0 0 0 7 18Z"/><path d="m9 12 3-3 3 3M12 9v6"/></svg>
+        存檔到雲端
+      </button>
+      <button class="cloud-button logout-button" id="logoutButton" type="button" hidden>登出</button>
+    </div>
+
+    <nav class="period-tabs main-tabs" id="periodTabs" aria-label="任務頁面">
+      <button class="period-tab active" type="button" data-view="daily" aria-selected="true"><span>今日</span><small>0</small></button>
+      <button class="period-tab" type="button" data-view="weekly" aria-selected="false"><span>本周</span><small>0</small></button>
+      <button class="period-tab" type="button" data-view="monthly" aria-selected="false"><span>本月</span><small>0</small></button>
+      <button class="period-tab" type="button" data-view="yearly" aria-selected="false"><span>今年</span><small>0</small></button>
+      <button class="period-tab project-tab" type="button" data-view="projects" aria-selected="false"><span>專案計畫</span><small>0</small></button>
+    </nav>
+    <button class="install-app" id="installApp" type="button" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 20h14"/></svg>
+      安裝任務 App
+    </button>
+
+    <section class="task-section tab-view" id="timelineView" aria-labelledby="taskTitle">
+      <div class="section-heading period-heading">
+        <div><p class="section-label">MY TIMELINE</p><h2 id="taskTitle">時間任務</h2></div>
+        <button class="reset-button" id="resetButton" type="button" title="清除全部完成狀態">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v6h6M20 20v-6h-6M5.1 15a7 7 0 0 0 11.7 2.6L20 14M4 10l3.2-3.6A7 7 0 0 1 18.9 9"/></svg>
+          重設進度
+        </button>
+      </div>
+
+      <div class="period-panel">
+        <div class="period-intro">
+          <div><span class="period-kicker" id="periodKicker">TODAY</span><h3 id="periodTitle">每日任務</h3><p id="periodDescription">今天完成，就很值得。</p></div>
+          <button class="add-button" id="showTaskForm" type="button"><span>＋</span> 新增任務</button>
+        </div>
+        <form class="quick-form" id="taskForm" hidden>
+          <label><span>任務名稱</span><input id="taskName" maxlength="40" placeholder="例如：散步 20 分鐘" required></label>
+          <label><span>小提醒（選填）</span><input id="taskNote" maxlength="60" placeholder="讓開始更容易一點"></label>
+          <div class="form-actions"><button class="text-button" id="cancelTask" type="button">取消</button><button class="primary-button" type="submit">加入任務</button></div>
+        </form>
+        <div class="task-list" id="taskList"></div>
+        <div class="empty-state" id="taskEmpty" hidden><span>○</span><p>這裡還沒有任務</p><small>新增一件想完成的小事吧。</small></div>
+      </div>
+    </section>
+
+    <section class="project-section tab-view" id="projectView" aria-labelledby="projectTitle" hidden>
+      <div class="section-heading">
+        <div><p class="section-label">PROJECT PLANS</p><h2 id="projectTitle">專案計畫</h2><p class="section-description">專案任務獨立整理，不會混進上面的時間任務。</p></div>
+        <div class="project-heading-actions">
+          <a class="history-link" href="history.html">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2"/></svg>
+            歷史完成
+          </a>
+          <button class="add-button project-add" id="showProjectForm" type="button"><span>＋</span> 新增專案</button>
+        </div>
+      </div>
+      <form class="quick-form project-form" id="projectForm" hidden>
+        <label><span>專案名稱</span><input id="projectName" maxlength="36" placeholder="例如：個人網站改版" required></label>
+        <label><span>專案類型</span><select id="projectType"><option value="short">短期案件</option><option value="long">長期技能養成</option></select></label>
+        <label><span>目標說明（選填）</span><input id="projectGoal" maxlength="60" placeholder="這個專案完成後會是什麼樣子？"></label>
+        <div class="form-actions"><button class="text-button" id="cancelProject" type="button">取消</button><button class="primary-button" type="submit">建立專案</button></div>
+      </form>
+      <div class="project-list" id="projectList"></div>
+      <div class="empty-state project-empty" id="projectEmpty" hidden><span>◇</span><p>還沒有專案計畫</p><small>建立一個專案，再把任務一步步放進來。</small></div>
+    </section>
+
+    <footer>
+      <div class="streak"><span aria-hidden="true">✦</span><p><span id="viewDoneName">今日</span>任務已完成 <strong id="todayDoneCount">0</strong> 件</p></div>
+      <p class="footer-note">每天一點點，也是在前進。</p>
+    </footer>
+  </main>
+  <dialog class="login-dialog" id="loginDialog">
+    <form class="login-panel" id="loginForm">
+      <button class="dialog-close" id="closeLogin" type="button" aria-label="關閉">×</button>
+      <p class="section-label">FIREBASE ACCOUNT</p>
+      <h2 id="loginTitle">登入雲端存檔</h2>
+      <p class="login-description" id="loginDescription">登入後可將目前所有內容安全存入自己的帳號。</p>
+      <label><span>Email</span><input id="loginEmail" type="email" autocomplete="email" required></label>
+      <label><span>密碼</span><input id="loginPassword" type="password" minlength="6" autocomplete="current-password" required></label>
+      <p class="login-message" id="loginMessage" role="status"></p>
+      <button class="login-submit" id="loginSubmit" type="submit">登入</button>
+      <button class="switch-auth-mode" id="switchAuthMode" type="button">還沒有帳號？建立帳號</button>
+    </form>
+  </dialog>
+  <div class="celebration" id="celebration" aria-live="polite"></div>
+  <script src="app.js"></script>
+  <script src="firebase-config.js"></script>
+  <script type="module" src="firebase-sync.js"></script>
+</body>
+</html>

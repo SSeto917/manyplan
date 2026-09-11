@@ -1,0 +1,27 @@
+{
+  "name": "任務計畫｜每天前進一點點",
+  "short_name": "任務計畫",
+  "description": "整理每日、每周、每月、今年與專案任務的個人計畫工具。",
+  "lang": "zh-Hant",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f3f4ef",
+  "theme_color": "#f3f4ef",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {
+      "src": "icons/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/app-icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

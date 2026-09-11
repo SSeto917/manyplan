@@ -1,0 +1,11 @@
+Firebase 設定步驟
+
+1. 前往 Firebase Console 建立專案與 Web App。
+2. Authentication > Sign-in method 啟用「電子郵件/密碼」。
+3. 建立 Cloud Firestore 資料庫。
+4. 將 Web App 的 firebaseConfig 複製到 firebase-config.js。
+5. 將 firestore.rules 的內容發布到 Firestore Rules。
+6. 雙擊「啟動PWA.cmd」，建立帳號或登入後即可按「存檔到雲端」。
+
+存檔位置：users/{使用者 uid}/saves/current
+每位使用者只能讀寫自己的資料。

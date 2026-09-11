@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f3f4ef">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>歷史完成｜今天也前進一點點</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/app-icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="design.css">
+</head>
+<body>
+  <main class="page-shell history-page">
+    <nav class="history-nav">
+      <a href="index.html">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg>
+        返回任務計畫
+      </a>
+    </nav>
+
+    <header class="history-hero">
+      <div>
+        <p class="eyebrow">COMPLETED HISTORY</p>
+        <h1>歷史完成<span>。</span></h1>
+        <p>每一個完成，都是你真的向前走過的證明。</p>
+      </div>
+      <div class="history-total"><strong id="historyCount">0</strong><span>件已完成</span></div>
+    </header>
+
+    <nav class="history-tabs" id="historyTabs" aria-label="歷史完成分類">
+      <button class="active" type="button" data-history-filter="daily" aria-selected="true">今日 <small>0</small></button>
+      <button type="button" data-history-filter="weekly" aria-selected="false">本周 <small>0</small></button>
+      <button type="button" data-history-filter="monthly" aria-selected="false">本月 <small>0</small></button>
+      <button type="button" data-history-filter="yearly" aria-selected="false">今年 <small>0</small></button>
+      <button type="button" data-history-filter="projects" aria-selected="false">專案 <small>0</small></button>
+    </nav>
+
+    <section class="history-content" aria-labelledby="historyTitle">
+      <div class="section-heading">
+        <div><p class="section-label" id="historyLabel">TODAY'S HISTORY</p><h2 id="historyTitle">今日完成紀錄</h2></div>
+      </div>
+      <div class="history-list" id="historyList"></div>
+      <div class="empty-state history-empty" id="historyEmpty" hidden>
+        <span>✓</span><p>還沒有完成紀錄</p><small id="historyEmptyHint">完成今日任務後，它會出現在這裡。</small>
+      </div>
+    </section>
+
+    <footer><p class="footer-note">完成的事不會消失，它們都成為了你的累積。</p></footer>
+  </main>
+  <script src="history.js"></script>
+</body>
+</html>
