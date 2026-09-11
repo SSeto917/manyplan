@@ -106,6 +106,12 @@ button, a { touch-action: manipulation; }
 .project-card .task-number { color: #b3c0b0; }
 .project-card .task-card.done .checkmark { background: #4e7b5b; border-color: #91ad8c; }
 .task-type { font-size: 12px; letter-spacing: 0; }
+.task-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.task-due { color: #68766b; font-size: 12px; font-weight: 700; }
+.daily-project-recurring { margin-top: 24px; padding-top: 18px; border-top: 1px solid #dce4d6; }
+.subsection-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.subsection-heading span { color: var(--muted); font-size: 12px; font-weight: 800; letter-spacing: .08em; }
+.subsection-heading h4 { margin: 0; font-size: 18px; }
 .task-type.once { color: #d2ddd0; }
 .task-type.recurring { color: #edcf97; background: #48553c; }
 .task-type.indicator { color: #c6e4cc; background: #365d48; }

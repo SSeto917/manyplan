@@ -22,8 +22,13 @@ let applyingCloudState = false;
 let lastSyncedState = "";
 
 function showMessage(message, success = false) {
+  if (!elements.message) return;
   elements.message.textContent = message;
   elements.message.classList.toggle("success", success);
+}
+
+function setStatus(message) {
+  if (elements.status) elements.status.textContent = message;
 }
 
 function getDeviceInfo() {
@@ -56,6 +61,11 @@ function describeCloudSave(data) {
   return `上一次存檔：${label}${time ? `・${time}` : ""}`;
 }
 
+function comparableTime(value) {
+  const date = value ? new Date(value) : null;
+  return date && Number.isFinite(date.getTime()) ? date.getTime() : 0;
+}
+
 function cloudDocRef() {
   return firebaseApi.doc(db, "users", currentUser.uid, "saves", "current");
 }
@@ -84,26 +94,35 @@ async function saveCurrentStateToCloud(label = "已同步・剛剛") {
   if (!currentUser || !db || !firebaseApi) return;
   const state = getLocalState();
   if (!state) return;
+  state.clientUpdatedAt ||= new Date().toISOString();
   const serialized = JSON.stringify(state);
   if (serialized === lastSyncedState) return;
   const device = getDeviceInfo();
   await firebaseApi.setDoc(cloudDocRef(), {
     state,
     schemaVersion: 2,
+    clientUpdatedAt: state.clientUpdatedAt,
     savedFrom: device.type,
     savedFromLabel: device.label,
     updatedAt: firebaseApi.serverTimestamp()
   }, { merge: true });
   lastSyncedState = serialized;
-  elements.status.textContent = `${label}・${device.label}`;
+  setStatus(`${label}・${device.label}`);
 }
 
-function scheduleCloudSave() {
+function scheduleCloudSave(event) {
   if (applyingCloudState || !currentUser || !db || !firebaseApi) return;
   clearTimeout(saveTimer);
+  if (event?.detail?.immediate) {
+    saveCurrentStateToCloud().catch((error) => {
+      setStatus("同步失敗");
+      console.error("Firebase autosave failed", error);
+    });
+    return;
+  }
   saveTimer = setTimeout(() => {
     saveCurrentStateToCloud().catch((error) => {
-      elements.status.textContent = "同步失敗";
+      setStatus("同步失敗");
       console.error("Firebase autosave failed", error);
     });
   }, 700);
@@ -111,12 +130,18 @@ function scheduleCloudSave() {
 
 async function loadCloudState() {
   if (!currentUser || !db || !firebaseApi) return;
-  elements.status.textContent = "正在同步…";
+  setStatus("正在同步…");
   const snapshot = await firebaseApi.getDoc(cloudDocRef());
   if (snapshot.exists() && snapshot.data()?.state) {
     const data = snapshot.data();
+    const localState = getLocalState();
+    if (comparableTime(localState?.clientUpdatedAt) > comparableTime(data.clientUpdatedAt || data.state?.clientUpdatedAt)) {
+      lastSyncedState = "";
+      await saveCurrentStateToCloud("已同步本機變更");
+      return;
+    }
     writeLocalState(data.state);
-    elements.status.textContent = describeCloudSave(data);
+    setStatus(describeCloudSave(data));
     return;
   }
   await saveCurrentStateToCloud("已建立雲端存檔");
@@ -134,6 +159,7 @@ function friendlyError(error) {
 }
 
 function updateAuthMode() {
+  if (!elements.title || !elements.description || !elements.submit || !elements.switchMode || !elements.password) return;
   const registering = authMode === "register";
   elements.title.textContent = registering ? "建立雲端帳號" : "登入雲端存檔";
   elements.description.textContent = registering ? "建立帳號後即可將所有任務存入 Firebase。" : "登入後可將目前所有內容安全存入自己的帳號。";
@@ -143,63 +169,69 @@ function updateAuthMode() {
   showMessage("");
 }
 
-elements.switchMode.addEventListener("click", () => {
-  if (!firebaseApi) return;
-  authMode = authMode === "login" ? "register" : "login";
-  updateAuthMode();
-});
+if (elements.switchMode) {
+  elements.switchMode.addEventListener("click", () => {
+    if (!firebaseApi) return;
+    authMode = authMode === "login" ? "register" : "login";
+    updateAuthMode();
+  });
+}
 
-elements.form.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  if (!firebaseApi || !auth) {
-    showMessage(configured ? "Firebase 尚未連線，請稍後再試。" : "請先完成 Firebase 專案設定。");
-    return;
-  }
-  elements.submit.disabled = true;
-  showMessage(authMode === "register" ? "正在建立帳號…" : "正在登入…");
-  try {
-    if (authMode === "register") await firebaseApi.createUserWithEmailAndPassword(auth, elements.email.value.trim(), elements.password.value);
-    else await firebaseApi.signInWithEmailAndPassword(auth, elements.email.value.trim(), elements.password.value);
-    elements.form.reset();
-    elements.dialog.close();
-  } catch (error) {
-    showMessage(friendlyError(error));
-  } finally {
-    elements.submit.disabled = false;
-  }
-});
+if (elements.form) {
+  elements.form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!firebaseApi || !auth) {
+      showMessage(configured ? "Firebase 尚未連線，請稍後再試。" : "請先完成 Firebase 專案設定。");
+      return;
+    }
+    elements.submit.disabled = true;
+    showMessage(authMode === "register" ? "正在建立帳號…" : "正在登入…");
+    try {
+      if (authMode === "register") await firebaseApi.createUserWithEmailAndPassword(auth, elements.email.value.trim(), elements.password.value);
+      else await firebaseApi.signInWithEmailAndPassword(auth, elements.email.value.trim(), elements.password.value);
+      elements.form.reset();
+      elements.dialog.close();
+    } catch (error) {
+      showMessage(friendlyError(error));
+    } finally {
+      elements.submit.disabled = false;
+    }
+  });
+}
 
-elements.save.addEventListener("click", async () => {
-  if (!currentUser || !db) return;
-  elements.save.classList.add("saving");
-  elements.save.textContent = "正在存檔…";
-  try {
-    lastSyncedState = "";
-    await saveCurrentStateToCloud("已存檔・剛剛");
-  } catch (error) {
-    elements.status.textContent = "存檔失敗";
-    console.error("Firebase save failed", error);
-  } finally {
-    elements.save.classList.remove("saving");
-    elements.save.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 18h10a4 4 0 0 0 .5-8A6 6 0 0 0 6 8.5 4.8 4.8 0 0 0 7 18Z"/><path d="m9 12 3-3 3 3M12 9v6"/></svg>存檔到雲端`;
-  }
-});
+if (elements.save) {
+  elements.save.addEventListener("click", async () => {
+    if (!currentUser || !db) return;
+    elements.save.classList.add("saving");
+    elements.save.textContent = "正在存檔…";
+    try {
+      lastSyncedState = "";
+      await saveCurrentStateToCloud("已存檔・剛剛");
+    } catch (error) {
+      setStatus("存檔失敗");
+      console.error("Firebase save failed", error);
+    } finally {
+      elements.save.classList.remove("saving");
+      elements.save.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 18h10a4 4 0 0 0 .5-8A6 6 0 0 0 6 8.5 4.8 4.8 0 0 0 7 18Z"/><path d="m9 12 3-3 3 3M12 9v6"/></svg>存檔到雲端`;
+    }
+  });
+}
 
-elements.logout.addEventListener("click", () => { if (auth && firebaseApi) firebaseApi.signOut(auth); });
+if (elements.logout) elements.logout.addEventListener("click", () => { if (auth && firebaseApi) firebaseApi.signOut(auth); });
 
 if (!configured) {
-  elements.status.textContent = "Firebase 尚未設定";
-  elements.title.textContent = "尚未連接 Firebase";
-  elements.description.textContent = "請先在 firebase-config.js 填入你的 Firebase 專案設定。";
-  elements.submit.disabled = true;
-  elements.switchMode.hidden = true;
+  setStatus("Firebase 尚未設定");
+  if (elements.title) elements.title.textContent = "尚未連接 Firebase";
+  if (elements.description) elements.description.textContent = "請先在 firebase-config.js 填入你的 Firebase 專案設定。";
+  if (elements.submit) elements.submit.disabled = true;
+  if (elements.switchMode) elements.switchMode.hidden = true;
 } else {
   initializeFirebase();
 }
 
 async function initializeFirebase() {
-  elements.status.textContent = "Firebase 連線中…";
-  elements.submit.disabled = true;
+  setStatus("Firebase 連線中…");
+  if (elements.submit) elements.submit.disabled = true;
   try {
     const [appSdk, authSdk, firestoreSdk] = await Promise.all([
       import("https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js"),
@@ -211,13 +243,13 @@ async function initializeFirebase() {
     auth = authSdk.getAuth(app);
     db = firestoreSdk.getFirestore(app);
     await authSdk.setPersistence(auth, authSdk.browserLocalPersistence);
-    elements.submit.disabled = false;
+    if (elements.submit) elements.submit.disabled = false;
     authSdk.onAuthStateChanged(auth, async (user) => {
       currentUser = user;
-      elements.open.hidden = Boolean(user);
-      elements.save.hidden = !user;
-      elements.logout.hidden = !user;
-      elements.status.textContent = user ? user.email : "尚未登入";
+      if (elements.open) elements.open.hidden = Boolean(user);
+      if (elements.save) elements.save.hidden = !user;
+      if (elements.logout) elements.logout.hidden = !user;
+      setStatus(user ? user.email : "尚未登入");
       clearTimeout(saveTimer);
       window.removeEventListener("planner:state-saved", scheduleCloudSave);
       if (!user) {
@@ -230,15 +262,15 @@ async function initializeFirebase() {
       try {
         await loadCloudState();
       } catch (error) {
-        elements.status.textContent = "同步失敗";
+        setStatus("同步失敗");
         console.error("Firebase load failed", error);
       }
     });
   } catch (error) {
     firebaseApi = null;
-    elements.status.textContent = "Firebase 載入失敗";
-    elements.title.textContent = "無法載入 Firebase";
-    elements.description.textContent = "請確認網路連線，並使用「啟動PWA.cmd」開啟網站。";
+    setStatus("Firebase 載入失敗");
+    if (elements.title) elements.title.textContent = "無法載入 Firebase";
+    if (elements.description) elements.description.textContent = "請確認網路連線，並使用「啟動PWA.cmd」開啟網站。";
     showMessage("Firebase SDK 載入失敗，登入功能目前無法使用。");
     console.error("Firebase initialization failed", error);
   }

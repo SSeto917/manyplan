@@ -25,7 +25,6 @@ function loadHistory() {
     const state = window.PlannerTasks.normalize(JSON.parse(localStorage.getItem(STORAGE_KEY)));
     if (!state) return [];
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    window.dispatchEvent(new CustomEvent("planner:state-saved"));
     return state.history.slice();
   } catch { return []; }
 }
@@ -114,8 +113,9 @@ historyList.addEventListener("click", (event) => {
     if (!state) throw new Error("Missing save");
     const result = window.PlannerTasks.restore(state, button.dataset.restoreId);
     if (result.ok) {
+      state.clientUpdatedAt = new Date().toISOString();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      window.dispatchEvent(new CustomEvent("planner:state-saved"));
+      window.dispatchEvent(new CustomEvent("planner:state-saved", { detail: { immediate: true } }));
     }
     render();
     status.textContent = result.message;

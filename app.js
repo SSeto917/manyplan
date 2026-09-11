@@ -30,6 +30,7 @@ const seedState = {
 
 const elements = {
   taskList: document.querySelector("#taskList"), taskEmpty: document.querySelector("#taskEmpty"),
+  dailyProjectRecurring: document.querySelector("#dailyProjectRecurring"), projectRecurringList: document.querySelector("#projectRecurringList"),
   projectList: document.querySelector("#projectList"), projectEmpty: document.querySelector("#projectEmpty"),
   periodTabs: document.querySelector("#periodTabs"), periodTitle: document.querySelector("#periodTitle"),
   periodKicker: document.querySelector("#periodKicker"), periodDescription: document.querySelector("#periodDescription"),
@@ -62,7 +63,8 @@ function loadState() {
   return window.PlannerTasks.normalize(initial);
 }
 
-function saveState() {
+function saveState(touch = true) {
+  if (touch) state.clientUpdatedAt = new Date().toISOString();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   window.dispatchEvent(new CustomEvent("planner:state-saved"));
 }
@@ -88,11 +90,24 @@ function escapeHTML(value) {
   return String(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[char]);
 }
 
+function recurrenceLabel(task) {
+  if (task.taskType !== "recurring") return "";
+  return { daily: "每日循環", monthly: "每月循環", yearly: "每年循環" }[task.recurrence || "daily"] || "每日循環";
+}
+
+function formatDue(task) {
+  if (!task.dueDate && !task.dueTime) return "";
+  let value = task.dueDate ? task.dueDate.replaceAll("-", "/") : "未定日期";
+  if (task.dueTime) value += ` ${task.dueTime}`;
+  return `截止 ${value}`;
+}
+
 function taskCard(task, index, type = "timeline", projectId = "") {
   const projectTypeLabel = task.taskType === "indicator"
     ? `<span class="task-type indicator">◆ 指標性任務</span>`
-    : `<span class="task-type ${task.taskType === "recurring" ? "recurring" : "once"}">${task.taskType === "recurring" ? "↻ 循環性任務" : "✓ 一次性任務"}</span>`;
-  const note = `<span class="task-meta">${projectTypeLabel}</span>`;
+    : `<span class="task-type ${task.taskType === "recurring" ? "recurring" : "once"}">${task.taskType === "recurring" ? `↻ 循環性任務・${recurrenceLabel(task)}` : "✓ 一次性任務"}</span>`;
+  const due = formatDue(task);
+  const note = `<span class="task-meta">${projectTypeLabel}${due ? `<span class="task-due">${escapeHTML(due)}</span>` : ""}</span>`;
   return `<article class="task-card ${task.done ? "done" : ""}" data-id="${escapeHTML(task.id)}" data-kind="${type}" ${projectId ? `data-project-id="${escapeHTML(projectId)}"` : ""}>
     <button class="task-toggle" type="button" aria-pressed="${task.done}" aria-label="${task.done ? "設為未完成" : "設為完成"}：${escapeHTML(task.title)}">
       <span class="task-number">${String(index + 1).padStart(2, "0")}</span>
@@ -106,11 +121,18 @@ function taskCard(task, index, type = "timeline", projectId = "") {
 function renderTasks() {
   const meta = periodMeta[state.activePeriod] || periodMeta.daily;
   const tasks = state.tasks.filter((task) => task.period === state.activePeriod);
+  const projectRecurringTasks = state.projects.flatMap((project) => (project.tasks || [])
+    .filter((task) => task.taskType === "recurring")
+    .map((task) => ({ project, task })));
   elements.periodTitle.textContent = meta.title;
   elements.periodKicker.textContent = meta.kicker;
   elements.periodDescription.textContent = meta.description;
   elements.taskList.innerHTML = tasks.map((task, index) => taskCard(task, index)).join("");
   elements.taskEmpty.hidden = tasks.length > 0;
+  elements.dailyProjectRecurring.hidden = state.activePeriod !== "daily" || projectRecurringTasks.length === 0;
+  elements.projectRecurringList.innerHTML = state.activePeriod === "daily"
+    ? projectRecurringTasks.map(({ project, task }, index) => taskCard({ ...task, title: `${project.name}｜${task.title}` }, index, "project-recurring", project.id)).join("")
+    : "";
   document.querySelectorAll(".period-tab").forEach((tab) => {
     const view = tab.dataset.view;
     const active = view === activeView;
@@ -166,6 +188,13 @@ function renderProjects() {
           <option value="recurring">循環性任務</option>
           <option value="indicator">指標性任務・計入進度</option>
         </select>
+        <select name="projectTaskRecurrence" aria-label="循環頻率">
+          <option value="daily">每日循環</option>
+          <option value="monthly">每月循環</option>
+          <option value="yearly">每年循環</option>
+        </select>
+        <input name="projectDueDate" type="date" aria-label="截止日期">
+        <input name="projectDueTime" type="time" aria-label="截止時間">
         <button type="submit">加入</button>
       </form>
     </article>`;
@@ -281,6 +310,16 @@ elements.taskList.addEventListener("click", (event) => {
   }
 });
 
+elements.projectRecurringList.addEventListener("click", (event) => {
+  const card = event.target.closest(".task-card");
+  if (!card) return;
+  if (event.target.closest(".delete-task")) {
+    mutateTask(card.dataset.id, card.dataset.projectId, (_task, list) => list.splice(list.findIndex((item) => item.id === card.dataset.id), 1));
+  } else if (event.target.closest(".task-toggle")) {
+    if (toggleProjectTask(card.dataset.projectId, card.dataset.id)) launchConfetti();
+  }
+});
+
 elements.projectList.addEventListener("click", (event) => {
   const projectTab = event.target.closest(".project-selector-tab");
   if (projectTab) {
@@ -333,8 +372,11 @@ elements.projectList.addEventListener("submit", (event) => {
   const title = form.elements.projectTaskName.value.trim();
   const allowedTypes = new Set(["once", "recurring", "indicator"]);
   const taskType = allowedTypes.has(form.elements.projectTaskType.value) ? form.elements.projectTaskType.value : "once";
+  const recurrence = ["daily", "monthly", "yearly"].includes(form.elements.projectTaskRecurrence.value) ? form.elements.projectTaskRecurrence.value : "daily";
+  const dueDate = form.elements.projectDueDate.value;
+  const dueTime = form.elements.projectDueTime.value;
   if (!project || !title) return;
-  project.tasks.push({ id: createId("project-task"), title, taskType, isMilestone: taskType === "indicator", done: false });
+  project.tasks.push({ id: createId("project-task"), title, taskType, recurrence, dueDate, dueTime, isMilestone: taskType === "indicator", done: false });
   saveState(); render();
 });
 
@@ -344,8 +386,11 @@ elements.taskForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const title = document.querySelector("#taskName").value.trim();
   const taskType = document.querySelector("#taskType").value === "recurring" ? "recurring" : "once";
+  const recurrence = ["daily", "monthly", "yearly"].includes(document.querySelector("#taskRecurrence").value) ? document.querySelector("#taskRecurrence").value : "daily";
+  const dueDate = document.querySelector("#taskDueDate").value;
+  const dueTime = document.querySelector("#taskDueTime").value;
   if (!title) return;
-  state.tasks.push({ id: createId("task"), period: state.activePeriod, title, taskType, done: false });
+  state.tasks.push({ id: createId("task"), period: state.activePeriod, title, taskType, recurrence, dueDate, dueTime, done: false });
   elements.taskForm.reset(); elements.taskForm.hidden = true;
   saveState(); render();
 });
@@ -405,11 +450,11 @@ closeLogin.addEventListener("click", () => loginDialog.close());
 loginDialog.addEventListener("click", (event) => { if (event.target === loginDialog) loginDialog.close(); });
 loginForm.addEventListener("submit", (event) => event.preventDefault());
 
-saveState();
+saveState(false);
 render();
 
 // Refresh when history restores a task in another tab or from the back-forward cache.
-function refreshSavedTasks() { state = loadState(); saveState(); render(); scheduleDailyReset(); }
+function refreshSavedTasks() { state = loadState(); saveState(false); render(); scheduleDailyReset(); }
 window.addEventListener("pageshow", refreshSavedTasks);
 window.addEventListener("storage", (event) => { if (event.key === STORAGE_KEY) refreshSavedTasks(); });
 window.addEventListener("planner:state-loaded", refreshSavedTasks);

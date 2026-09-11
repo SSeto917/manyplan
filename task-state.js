@@ -7,14 +7,25 @@ window.PlannerTasks = (() => {
     delete copy.completedAt;
     return copy;
   }
+  function nextResetAt(entry) {
+    const completedAt = new Date(entry.completedAt);
+    if (!Number.isFinite(completedAt.getTime())) return null;
+    const resetAt = new Date(completedAt);
+    resetAt.setHours(5, 0, 0, 0);
+    const recurrence = entry.recurrence || entry.taskSnapshot?.recurrence || 'daily';
+    if (recurrence === 'monthly') resetAt.setMonth(resetAt.getMonth() + 1);
+    else if (recurrence === 'yearly') resetAt.setFullYear(resetAt.getFullYear() + 1);
+    else if (resetAt <= completedAt) resetAt.setDate(resetAt.getDate() + 1);
+    return resetAt;
+  }
   function entryFor(task, project, index, reward = 0) {
     return {
       id: newId(), taskId: task.id, title: task.title,
       source: project ? 'project' : 'timeline',
       ...(project ? { projectId: project.id, projectName: project.name,
-        taskType: task.taskType || 'once', isMilestone: Boolean(task.isMilestone),
+        taskType: task.taskType || 'once', recurrence: task.recurrence || 'daily', isMilestone: Boolean(task.isMilestone),
         projectSnapshot: { id: project.id, name: project.name, goal: project.goal || '', projectType: project.projectType || 'short' }
-      } : { period: task.period, taskType: task.taskType || 'once' }),
+      } : { period: task.period, taskType: task.taskType || 'once', recurrence: task.recurrence || 'daily' }),
       taskSnapshot: pending(task), originalIndex: index,
       completedAt: task.completedAt || new Date().toISOString(), reward
     };
@@ -45,10 +56,8 @@ window.PlannerTasks = (() => {
     });
     state.history.forEach(entry => {
       if (entry.resetProcessed || entry.taskSnapshot?.taskType !== 'recurring') return;
-      const resetAt = new Date(entry.completedAt);
-      if (!Number.isFinite(resetAt.getTime())) return;
-      resetAt.setHours(5, 0, 0, 0);
-      if (resetAt <= new Date(entry.completedAt)) resetAt.setDate(resetAt.getDate() + 1);
+      const resetAt = nextResetAt(entry);
+      if (!resetAt) return;
       if (now < resetAt) return;
       entry.resetProcessed = true;
       const project = entry.projectId ? state.projects.find(item => item.id === entry.projectId) : null;

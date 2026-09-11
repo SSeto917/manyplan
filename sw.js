@@ -1,4 +1,4 @@
-const CACHE_NAME = "task-planner-v18-save-device";
+const CACHE_NAME = "task-planner-v21-recurring-due-history";
 const APP_SHELL = [
   "./fonts/HYWenHei-Extended.ttf",
   "./",
