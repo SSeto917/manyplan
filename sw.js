@@ -1,4 +1,4 @@
-const CACHE_NAME = "task-planner-v17-firebase-sync";
+const CACHE_NAME = "task-planner-v18-save-device";
 const APP_SHELL = [
   "./fonts/HYWenHei-Extended.ttf",
   "./",

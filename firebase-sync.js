@@ -26,6 +26,36 @@ function showMessage(message, success = false) {
   elements.message.classList.toggle("success", success);
 }
 
+function getDeviceInfo() {
+  const ua = navigator.userAgent || "";
+  const platform = navigator.platform || "";
+  const touchCapable = navigator.maxTouchPoints > 1;
+  if (/iPad/i.test(ua) || (platform === "MacIntel" && touchCapable)) {
+    return { type: "ipad", label: "iPad 端" };
+  }
+  if (/Mobi|Android|iPhone|iPod/i.test(ua)) {
+    return { type: "phone", label: "手機端" };
+  }
+  return { type: "desktop", label: "電腦端" };
+}
+
+function formatSavedAt(value) {
+  const date = value?.toDate ? value.toDate() : value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("zh-TW", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(date);
+}
+
+function describeCloudSave(data) {
+  const label = data?.savedFromLabel || "未知裝置";
+  const time = formatSavedAt(data?.updatedAt);
+  return `上一次存檔：${label}${time ? `・${time}` : ""}`;
+}
+
 function cloudDocRef() {
   return firebaseApi.doc(db, "users", currentUser.uid, "saves", "current");
 }
@@ -56,13 +86,16 @@ async function saveCurrentStateToCloud(label = "已同步・剛剛") {
   if (!state) return;
   const serialized = JSON.stringify(state);
   if (serialized === lastSyncedState) return;
+  const device = getDeviceInfo();
   await firebaseApi.setDoc(cloudDocRef(), {
     state,
     schemaVersion: 2,
+    savedFrom: device.type,
+    savedFromLabel: device.label,
     updatedAt: firebaseApi.serverTimestamp()
   }, { merge: true });
   lastSyncedState = serialized;
-  elements.status.textContent = label;
+  elements.status.textContent = `${label}・${device.label}`;
 }
 
 function scheduleCloudSave() {
@@ -81,8 +114,9 @@ async function loadCloudState() {
   elements.status.textContent = "正在同步…";
   const snapshot = await firebaseApi.getDoc(cloudDocRef());
   if (snapshot.exists() && snapshot.data()?.state) {
-    writeLocalState(snapshot.data().state);
-    elements.status.textContent = "已同步雲端資料";
+    const data = snapshot.data();
+    writeLocalState(data.state);
+    elements.status.textContent = describeCloudSave(data);
     return;
   }
   await saveCurrentStateToCloud("已建立雲端存檔");
@@ -142,7 +176,6 @@ elements.save.addEventListener("click", async () => {
   try {
     lastSyncedState = "";
     await saveCurrentStateToCloud("已存檔・剛剛");
-    elements.status.textContent = "已存檔・剛剛";
   } catch (error) {
     elements.status.textContent = "存檔失敗";
     console.error("Firebase save failed", error);
