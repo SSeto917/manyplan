@@ -25,6 +25,7 @@ function loadHistory() {
     const state = window.PlannerTasks.normalize(JSON.parse(localStorage.getItem(STORAGE_KEY)));
     if (!state) return [];
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    window.dispatchEvent(new CustomEvent("planner:state-saved"));
     return state.history.slice();
   } catch { return []; }
 }
@@ -112,10 +113,14 @@ historyList.addEventListener("click", (event) => {
     const state = window.PlannerTasks.normalize(JSON.parse(localStorage.getItem(STORAGE_KEY)));
     if (!state) throw new Error("Missing save");
     const result = window.PlannerTasks.restore(state, button.dataset.restoreId);
-    if (result.ok) localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    if (result.ok) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      window.dispatchEvent(new CustomEvent("planner:state-saved"));
+    }
     render();
     status.textContent = result.message;
   } catch { status.textContent = "恢復失敗，請確認瀏覽器允許儲存資料後重試。"; }
 });
 window.addEventListener("pageshow", render);
 window.addEventListener("storage", (event) => { if (event.key === STORAGE_KEY) render(); });
+window.addEventListener("planner:state-loaded", render);

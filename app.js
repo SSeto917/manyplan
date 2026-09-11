@@ -62,7 +62,10 @@ function loadState() {
   return window.PlannerTasks.normalize(initial);
 }
 
-function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  window.dispatchEvent(new CustomEvent("planner:state-saved"));
+}
 function getDateKey(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
@@ -409,6 +412,7 @@ render();
 function refreshSavedTasks() { state = loadState(); saveState(); render(); scheduleDailyReset(); }
 window.addEventListener("pageshow", refreshSavedTasks);
 window.addEventListener("storage", (event) => { if (event.key === STORAGE_KEY) refreshSavedTasks(); });
+window.addEventListener("planner:state-loaded", refreshSavedTasks);
 let resetTimer;
 function scheduleDailyReset() {
   clearTimeout(resetTimer);

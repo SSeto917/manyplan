@@ -16,10 +16,76 @@ let db = null;
 let currentUser = null;
 let authMode = "login";
 let firebaseApi = null;
+let unsubscribeSave = null;
+let saveTimer = null;
+let applyingCloudState = false;
+let lastSyncedState = "";
 
 function showMessage(message, success = false) {
   elements.message.textContent = message;
   elements.message.classList.toggle("success", success);
+}
+
+function cloudDocRef() {
+  return firebaseApi.doc(db, "users", currentUser.uid, "saves", "current");
+}
+
+function getLocalState() {
+  try {
+    const state = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    return window.PlannerTasks?.normalize ? window.PlannerTasks.normalize(state) : state;
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalState(state) {
+  const normalized = window.PlannerTasks?.normalize ? window.PlannerTasks.normalize(state) : state;
+  if (!normalized) return false;
+  applyingCloudState = true;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+  lastSyncedState = JSON.stringify(normalized);
+  window.dispatchEvent(new CustomEvent("planner:state-loaded"));
+  applyingCloudState = false;
+  return true;
+}
+
+async function saveCurrentStateToCloud(label = "已同步・剛剛") {
+  if (!currentUser || !db || !firebaseApi) return;
+  const state = getLocalState();
+  if (!state) return;
+  const serialized = JSON.stringify(state);
+  if (serialized === lastSyncedState) return;
+  await firebaseApi.setDoc(cloudDocRef(), {
+    state,
+    schemaVersion: 2,
+    updatedAt: firebaseApi.serverTimestamp()
+  }, { merge: true });
+  lastSyncedState = serialized;
+  elements.status.textContent = label;
+}
+
+function scheduleCloudSave() {
+  if (applyingCloudState || !currentUser || !db || !firebaseApi) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    saveCurrentStateToCloud().catch((error) => {
+      elements.status.textContent = "同步失敗";
+      console.error("Firebase autosave failed", error);
+    });
+  }, 700);
+}
+
+async function loadCloudState() {
+  if (!currentUser || !db || !firebaseApi) return;
+  elements.status.textContent = "正在同步…";
+  const snapshot = await firebaseApi.getDoc(cloudDocRef());
+  if (snapshot.exists() && snapshot.data()?.state) {
+    writeLocalState(snapshot.data().state);
+    elements.status.textContent = "已同步雲端資料";
+    return;
+  }
+  await saveCurrentStateToCloud("已建立雲端存檔");
 }
 
 function friendlyError(error) {
@@ -71,17 +137,11 @@ elements.form.addEventListener("submit", async (event) => {
 
 elements.save.addEventListener("click", async () => {
   if (!currentUser || !db) return;
-  let state;
-  try { state = JSON.parse(localStorage.getItem(STORAGE_KEY)); } catch { state = null; }
-  if (!state) return;
   elements.save.classList.add("saving");
   elements.save.textContent = "正在存檔…";
   try {
-    await firebaseApi.setDoc(firebaseApi.doc(db, "users", currentUser.uid, "saves", "current"), {
-      state,
-      schemaVersion: 2,
-      updatedAt: firebaseApi.serverTimestamp()
-    });
+    lastSyncedState = "";
+    await saveCurrentStateToCloud("已存檔・剛剛");
     elements.status.textContent = "已存檔・剛剛";
   } catch (error) {
     elements.status.textContent = "存檔失敗";
@@ -119,12 +179,27 @@ async function initializeFirebase() {
     db = firestoreSdk.getFirestore(app);
     await authSdk.setPersistence(auth, authSdk.browserLocalPersistence);
     elements.submit.disabled = false;
-    authSdk.onAuthStateChanged(auth, (user) => {
+    authSdk.onAuthStateChanged(auth, async (user) => {
       currentUser = user;
       elements.open.hidden = Boolean(user);
       elements.save.hidden = !user;
       elements.logout.hidden = !user;
       elements.status.textContent = user ? user.email : "尚未登入";
+      clearTimeout(saveTimer);
+      window.removeEventListener("planner:state-saved", scheduleCloudSave);
+      if (!user) {
+        unsubscribeSave = null;
+        lastSyncedState = "";
+        return;
+      }
+      window.addEventListener("planner:state-saved", scheduleCloudSave);
+      unsubscribeSave = scheduleCloudSave;
+      try {
+        await loadCloudState();
+      } catch (error) {
+        elements.status.textContent = "同步失敗";
+        console.error("Firebase load failed", error);
+      }
     });
   } catch (error) {
     firebaseApi = null;
