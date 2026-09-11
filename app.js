@@ -50,28 +50,7 @@ function loadState() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
     if (saved && Array.isArray(saved.tasks) && Array.isArray(saved.projects)) {
-      saved.primogems = Number.isSafeInteger(saved.primogems) && saved.primogems >= 0 ? saved.primogems : 0;
-      if (!Array.isArray(saved.history)) saved.history = [];
-      saved.tasks.forEach((task) => {
-        if (task.done && !task.completionHistoryId) {
-          const existing = saved.history.find((entry) => entry.source === "timeline" && entry.taskId === task.id);
-          const entry = existing || createTimelineHistoryEntry(task);
-          if (!existing) saved.history.push(entry);
-          task.completionHistoryId = entry.id;
-          task.completedAt = entry.completedAt;
-        }
-      });
-      saved.projects.forEach((project) => {
-        if (!project.projectType) project.projectType = "short";
-        project.tasks.forEach((task) => {
-          if (task.isMilestone) task.taskType = "indicator";
-          else if (!task.taskType) task.taskType = "once";
-        });
-        const completedOnce = project.tasks.filter((task) => task.taskType === "once" && task.done);
-        completedOnce.forEach((task) => saved.history.push(createHistoryEntry(task, project)));
-        project.tasks = project.tasks.filter((task) => !(task.taskType === "once" && task.done));
-      });
-      return saved;
+      return window.PlannerTasks.normalize(saved);
     }
   } catch {}
   const initial = cloneSeed();
@@ -80,7 +59,7 @@ function loadState() {
     initial.tasks[0].done = legacyDone.has("room");
     initial.tasks[1].done = legacyDone.has("read");
   } catch {}
-  return initial;
+  return window.PlannerTasks.normalize(initial);
 }
 
 function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
@@ -110,9 +89,7 @@ function taskCard(task, index, type = "timeline", projectId = "") {
   const projectTypeLabel = task.taskType === "indicator"
     ? `<span class="task-type indicator">◆ 指標性任務</span>`
     : `<span class="task-type ${task.taskType === "recurring" ? "recurring" : "once"}">${task.taskType === "recurring" ? "↻ 循環性任務" : "✓ 一次性任務"}</span>`;
-  const note = type === "timeline"
-    ? escapeHTML(task.note || "完成它，替自己留下一個小小的進度。")
-    : `<span class="task-meta">${projectTypeLabel}</span>`;
+  const note = `<span class="task-meta">${projectTypeLabel}</span>`;
   return `<article class="task-card ${task.done ? "done" : ""}" data-id="${escapeHTML(task.id)}" data-kind="${type}" ${projectId ? `data-project-id="${escapeHTML(projectId)}"` : ""}>
     <button class="task-toggle" type="button" aria-pressed="${task.done}" aria-label="${task.done ? "設為未完成" : "設為完成"}：${escapeHTML(task.title)}">
       <span class="task-number">${String(index + 1).padStart(2, "0")}</span>
@@ -136,9 +113,11 @@ function renderTasks() {
     const active = view === activeView;
     tab.classList.toggle("active", active);
     tab.setAttribute("aria-selected", String(active));
-    tab.querySelector("small").textContent = view === "projects"
+    const count = view === "projects"
       ? state.projects.length
       : state.tasks.filter((task) => task.period === view && !task.done).length;
+    tab.querySelector("small").textContent = count;
+    tab.querySelector("small").hidden = count === 0;
   });
 }
 
@@ -200,7 +179,7 @@ function renderProjects() {
     return `<section class="project-selector-group ${group.type}">
       <div class="project-selector-label"><span>${group.label}</span><strong>${group.title}</strong></div>
       <div class="project-selector-tabs" role="tablist" aria-label="${group.title}">
-        ${projects.map((project) => `<button class="project-selector-tab ${project.id === activeProjectId ? "active" : ""}" type="button" role="tab" aria-selected="${project.id === activeProjectId}" data-project-tab-id="${escapeHTML(project.id)}"><span>${escapeHTML(project.name)}</span><small>${project.tasks.length}</small></button>`).join("")}
+        ${projects.map((project) => `<button class="project-selector-tab ${project.id === activeProjectId ? "active" : ""}" type="button" role="tab" aria-selected="${project.id === activeProjectId}" data-project-tab-id="${escapeHTML(project.id)}"><span>${escapeHTML(project.name)}</span><small ${project.tasks.length === 0 ? "hidden" : ""}>${project.tasks.length}</small></button>`).join("")}
       </div>
     </section>`;
   }).join("");
@@ -210,10 +189,10 @@ function renderProjects() {
 }
 
 function renderProgress() {
-  const allTasks = state.tasks.filter((task) => task.period === activeView);
+  const completedTasks = state.history.filter((entry) => entry.source === "timeline" && entry.period === activeView);
   const selectedProject = state.projects.find((project) => project.id === activeProjectId);
   const projectProgress = getProjectProgress(selectedProject);
-  const done = activeView === "projects" ? projectProgress.done : allTasks.filter((task) => task.done).length;
+  const done = activeView === "projects" ? projectProgress.done : completedTasks.length;
   const nameMap = { daily: "今日", weekly: "本周", monthly: "本月", yearly: "今年", projects: "專案" };
   elements.viewDoneName.textContent = nameMap[activeView];
   elements.todayDoneCount.textContent = done;
@@ -225,7 +204,16 @@ function renderVisibility() {
   elements.projectView.hidden = !showingProjects;
 }
 
-function render() { document.querySelector("#primogemCount").textContent = state.primogems.toLocaleString("zh-TW"); renderTasks(); if (activeView === "projects") renderProjects(); renderProgress(); renderVisibility(); }
+function fitPrimogemCount() {
+  const count = document.querySelector("#primogemCount");
+  count.style.fontSize = "28px";
+  if (count.scrollWidth > count.clientWidth && count.clientWidth > 0) {
+    count.style.fontSize = `${Math.floor(28 * count.clientWidth / count.scrollWidth * 0.95)}px`;
+  }
+}
+window.addEventListener("resize", fitPrimogemCount);
+document.fonts.ready.then(fitPrimogemCount);
+function render() { document.querySelector("#primogemCount").textContent = state.primogems.toLocaleString("zh-TW"); fitPrimogemCount(); renderTasks(); if (activeView === "projects") renderProjects(); renderProgress(); renderVisibility(); }
 
 function mutateTask(id, projectId, mutation) {
   if (projectId) {
@@ -240,26 +228,15 @@ function mutateTask(id, projectId, mutation) {
 }
 
 function toggleProjectTask(projectId, taskId) {
-  const project = state.projects.find((item) => item.id === projectId);
-  const taskIndex = project?.tasks.findIndex((item) => item.id === taskId) ?? -1;
-  if (!project || taskIndex < 0) return false;
-  const task = project.tasks[taskIndex];
-  if (task.taskType !== "once") {
-    task.done = !task.done;
-    if (task.done) awardPrimogems();
-    saveState(); render();
-    return task.done;
-  }
+  const completed = window.PlannerTasks.complete(state, taskId, projectId);
+  if (!completed) return false;
   awardPrimogems();
-  state.history.push(createHistoryEntry(task, project));
-  project.tasks.splice(taskIndex, 1);
   saveState(); render();
   return true;
 }
 
 let rewardNoticeTimer;
 function awardPrimogems() {
-  state.primogems += 20;
   const notice = document.querySelector("#primogemNotice");
   notice.textContent = "任務完成！獲得 20 原石 ✦";
   notice.hidden = false;
@@ -293,23 +270,11 @@ elements.taskList.addEventListener("click", (event) => {
   if (event.target.closest(".delete-task")) {
     mutateTask(card.dataset.id, "", (_task, list) => list.splice(list.findIndex((item) => item.id === card.dataset.id), 1));
   } else if (event.target.closest(".task-toggle")) {
-    let becameDone = false;
-    mutateTask(card.dataset.id, "", (task) => {
-      task.done = !task.done;
-      becameDone = task.done;
-      if (task.done) {
-        awardPrimogems();
-        const entry = createTimelineHistoryEntry(task);
-        state.history.push(entry);
-        task.completionHistoryId = entry.id;
-        task.completedAt = entry.completedAt;
-      } else if (task.completionHistoryId) {
-        state.history = state.history.filter((entry) => entry.id !== task.completionHistoryId);
-        delete task.completionHistoryId;
-        delete task.completedAt;
-      }
-    });
-    if (becameDone) launchConfetti();
+    if (window.PlannerTasks.complete(state, card.dataset.id)) {
+      awardPrimogems();
+      saveState(); render();
+      launchConfetti();
+    }
   }
 });
 
@@ -375,9 +340,9 @@ document.querySelector("#cancelTask").addEventListener("click", () => { elements
 elements.taskForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const title = document.querySelector("#taskName").value.trim();
-  const note = document.querySelector("#taskNote").value.trim();
+  const taskType = document.querySelector("#taskType").value === "recurring" ? "recurring" : "once";
   if (!title) return;
-  state.tasks.push({ id: createId("task"), period: state.activePeriod, title, note, done: false });
+  state.tasks.push({ id: createId("task"), period: state.activePeriod, title, taskType, done: false });
   elements.taskForm.reset(); elements.taskForm.hidden = true;
   saveState(); render();
 });
@@ -397,15 +362,6 @@ elements.projectForm.addEventListener("submit", (event) => {
   saveState(); render();
 });
 
-document.querySelector("#resetButton").addEventListener("click", () => {
-  state.tasks.forEach((task) => {
-    task.done = false;
-    delete task.completionHistoryId;
-    delete task.completedAt;
-  });
-  state.projects.forEach((project) => project.tasks.forEach((task) => { task.done = false; }));
-  saveState(); render();
-});
 
 const installApp = document.querySelector("#installApp");
 window.addEventListener("beforeinstallprompt", (event) => {
@@ -448,3 +404,23 @@ loginForm.addEventListener("submit", (event) => event.preventDefault());
 
 saveState();
 render();
+
+// Refresh when history restores a task in another tab or from the back-forward cache.
+function refreshSavedTasks() { state = loadState(); saveState(); render(); scheduleDailyReset(); }
+window.addEventListener("pageshow", refreshSavedTasks);
+window.addEventListener("storage", (event) => { if (event.key === STORAGE_KEY) refreshSavedTasks(); });
+let resetTimer;
+function scheduleDailyReset() {
+  clearTimeout(resetTimer);
+  if (document.hidden) return;
+  const now = new Date();
+  const next = new Date(now);
+  next.setHours(5, 0, 0, 0);
+  if (next <= now) next.setDate(next.getDate() + 1);
+  resetTimer = setTimeout(refreshSavedTasks, next - now + 100);
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) clearTimeout(resetTimer);
+  else refreshSavedTasks();
+});
+scheduleDailyReset();

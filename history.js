@@ -13,7 +13,7 @@ const filterMeta = {
   weekly: { title: "本周完成紀錄", label: "WEEKLY HISTORY", hint: "完成本周任務後，它會出現在這裡。", type: "本周任務" },
   monthly: { title: "本月完成紀錄", label: "MONTHLY HISTORY", hint: "完成本月任務後，它會出現在這裡。", type: "本月任務" },
   yearly: { title: "今年完成紀錄", label: "YEARLY HISTORY", hint: "完成今年任務後，它會出現在這裡。", type: "今年任務" },
-  projects: { title: "專案完成紀錄", label: "PROJECT HISTORY", hint: "完成一次性專案任務後，它會出現在這裡。", type: "專案任務" }
+  projects: { title: "專案完成紀錄", label: "PROJECT HISTORY", hint: "完成專案任務後，它會出現在這裡。", type: "專案任務" }
 };
 
 function escapeHTML(value) {
@@ -22,21 +22,11 @@ function escapeHTML(value) {
 
 function loadHistory() {
   try {
-    const state = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    const history = Array.isArray(state?.history) ? state.history.slice() : [];
-    if (Array.isArray(state?.tasks)) {
-      state.tasks.filter((task) => task.done).forEach((task) => {
-        const exists = history.some((entry) => entry.source === "timeline" && entry.taskId === task.id);
-        if (!exists) history.push({
-          id: `current-${task.id}`, taskId: task.id, title: task.title,
-          source: "timeline", period: task.period, completedAt: task.completedAt || new Date().toISOString()
-        });
-      });
-    }
-    return history;
-  } catch {
-    return [];
-  }
+    const state = window.PlannerTasks.normalize(JSON.parse(localStorage.getItem(STORAGE_KEY)));
+    if (!state) return [];
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    return state.history.slice();
+  } catch { return []; }
 }
 
 function dateKey(value) {
@@ -76,6 +66,7 @@ function render() {
     button.classList.toggle("active", active);
     button.setAttribute("aria-selected", String(active));
     button.querySelector("small").textContent = count;
+    button.querySelector("small").hidden = count === 0;
   });
 
   const groups = new Map();
@@ -93,7 +84,8 @@ function render() {
           <article class="history-item">
             <span class="history-check" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12 4.5 4.5L19 7"/></svg></span>
             <div><h3>${escapeHTML(entry.title || "未命名任務")}</h3><p><span>${escapeHTML(isProjectEntry(entry) ? (entry.projectName || "未命名專案") : meta.type)}</span>・完成於 ${escapeHTML(formatTime(entry.completedAt))}</p></div>
-            <span class="history-type ${entry.isMilestone ? "milestone" : ""}">${isProjectEntry(entry) ? (entry.isMilestone ? "指標性任務" : "一次性") : meta.type}</span>
+            <span class="history-type ${entry.isMilestone ? "milestone" : ""}">${isProjectEntry(entry) ? (entry.isMilestone || entry.taskType === "indicator" ? "指標性任務" : entry.taskType === "recurring" ? "循環性任務" : "一次性") : meta.type}</span>
+            <button class="restore-task" type="button" data-restore-id="${escapeHTML(entry.id)}" aria-label="恢復任務：${escapeHTML(entry.title || "未命名任務")}">恢復任務</button>
           </article>`).join("")}
       </div>
     </section>`).join("");
@@ -111,3 +103,19 @@ render();
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js"));
 }
+
+historyList.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-restore-id]");
+  if (!button) return;
+  const status = document.querySelector("#restoreStatus");
+  try {
+    const state = window.PlannerTasks.normalize(JSON.parse(localStorage.getItem(STORAGE_KEY)));
+    if (!state) throw new Error("Missing save");
+    const result = window.PlannerTasks.restore(state, button.dataset.restoreId);
+    if (result.ok) localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    render();
+    status.textContent = result.message;
+  } catch { status.textContent = "恢復失敗，請確認瀏覽器允許儲存資料後重試。"; }
+});
+window.addEventListener("pageshow", render);
+window.addEventListener("storage", (event) => { if (event.key === STORAGE_KEY) render(); });

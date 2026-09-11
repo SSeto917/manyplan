@@ -1,4 +1,4 @@
-const CACHE_NAME = "task-planner-v8-quiet-design";
+const CACHE_NAME = "task-planner-v16-remove-brand";
 const APP_SHELL = [
   "./fonts/HYWenHei-Extended.ttf",
   "./",
@@ -6,7 +6,10 @@ const APP_SHELL = [
   "./history.html",
   "./styles.css",
   "./design.css",
+  "./theme.css",
+  "./theme.js",
   "./app.js",
+  "./task-state.js",
   "./history.js",
   "./firebase-config.js",
   "./firebase-sync.js",

@@ -11,6 +11,8 @@
   <link rel="icon" href="icons/app-icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="design.css">
+  <link rel="stylesheet" href="theme.css">
+  <script src="theme.js"></script>
 </head>
 <body>
   <main class="page-shell history-page">
@@ -19,6 +21,7 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg>
         返回任務計畫
       </a>
+      <button class="theme-toggle" type="button" data-theme-toggle>☾ 深色模式</button>
     </nav>
 
     <header class="history-hero">
@@ -42,6 +45,8 @@
       <div class="section-heading">
         <div><p class="section-label" id="historyLabel">TODAY'S HISTORY</p><h2 id="historyTitle">今日完成紀錄</h2></div>
       </div>
+      <p class="restore-hint">誤點完成了？按「恢復任務」即可移回清單，並扣回該次獲得的原石。</p>
+      <p id="restoreStatus" class="restore-status" role="status"></p>
       <div class="history-list" id="historyList"></div>
       <div class="empty-state history-empty" id="historyEmpty" hidden>
         <span>✓</span><p>還沒有完成紀錄</p><small id="historyEmptyHint">完成今日任務後，它會出現在這裡。</small>
@@ -50,6 +55,7 @@
 
     <footer><p class="footer-note">完成的事不會消失，它們都成為了你的累積。</p></footer>
   </main>
+  <script src="task-state.js"></script>
   <script src="history.js"></script>
 </body>
 </html>
