@@ -20,6 +20,24 @@ window.PlannerTasks = (() => {
   function monthKey(date) {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
   }
+  function playtimeKey(date) {
+    const copy = new Date(date);
+    copy.setHours(copy.getHours() - 5);
+    return dateKey(copy);
+  }
+  function normalizePlaytime(state, now) {
+    if (!state.genshinPlaytime || typeof state.genshinPlaytime !== 'object') {
+      state.genshinPlaytime = { minutes: 0, resetKey: playtimeKey(now) };
+      return;
+    }
+    const key = playtimeKey(now);
+    if (state.genshinPlaytime.resetKey !== key) {
+      state.genshinPlaytime.minutes = 0;
+      state.genshinPlaytime.resetKey = key;
+      state.clientUpdatedAt = now.toISOString();
+    }
+    state.genshinPlaytime.minutes = Math.max(0, Math.min(60, Number(state.genshinPlaytime.minutes) || 0));
+  }
   function nextResetAt(entry) {
     const completedAt = new Date(entry.completedAt);
     if (!Number.isFinite(completedAt.getTime())) return null;
@@ -80,7 +98,8 @@ window.PlannerTasks = (() => {
         projectSnapshot: { id: project.id, name: project.name, goal: project.goal || '', projectType: project.projectType || 'short' }
       } : { period: task.period, taskType: task.taskType || 'once', recurrence: task.recurrence || 'daily' }),
       taskSnapshot: pending(task), originalIndex: index,
-      completedAt: task.completedAt || new Date().toISOString(), reward
+      completedAt: task.completedAt || new Date().toISOString(), reward,
+      playMinutes: reward === 20 ? 5 : 0
     };
   }
   function normalize(state, now = new Date()) {
@@ -88,6 +107,7 @@ window.PlannerTasks = (() => {
     if (!Array.isArray(state.history)) state.history = [];
     if (!Array.isArray(state.incomplete)) state.incomplete = [];
     state.primogems = Number.isSafeInteger(state.primogems) && state.primogems >= 0 ? state.primogems : 0;
+    normalizePlaytime(state, now);
     function migrate(list, project) {
       list.forEach((task, index) => {
         if (project) task.taskType = task.isMilestone ? 'indicator' : task.taskType || 'once';
@@ -132,6 +152,8 @@ window.PlannerTasks = (() => {
     state.history.push(entryFor(list[index], project, index, 20));
     list.splice(index, 1);
     state.primogems += 20;
+    normalizePlaytime(state, new Date());
+    state.genshinPlaytime.minutes = Math.min(60, state.genshinPlaytime.minutes + 5);
     return true;
   }
   function restore(state, historyId) {
@@ -155,6 +177,10 @@ window.PlannerTasks = (() => {
     state.history.splice(index, 1);
     const refund = entry.reward === 20 ? 20 : 0;
     state.primogems = Math.max(0, state.primogems - refund);
+    if (entry.playMinutes === 5) {
+      normalizePlaytime(state, new Date());
+      state.genshinPlaytime.minutes = Math.max(0, state.genshinPlaytime.minutes - 5);
+    }
     return { ok: true, message: `已恢復至${project ? project.name : { daily: '今日', weekly: '本周', monthly: '本月', yearly: '今年' }[task.period] || '任務'}${refund ? '，並扣回 20 原石' : ''}。` };
   }
   function restoreIncomplete(state, incompleteId) {

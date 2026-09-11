@@ -39,6 +39,9 @@ const elements = {
   projectView: document.querySelector("#projectView"), celebration: document.querySelector("#celebration")
 };
 elements.viewDoneName = document.querySelector("#viewDoneName");
+elements.genshinMinutes = document.querySelector("#genshinMinutes");
+elements.genshinProgressBar = document.querySelector("#genshinProgressBar");
+elements.playtimeTrack = document.querySelector(".playtime-track");
 
 let state = loadState();
 let activeView = "daily";
@@ -230,6 +233,14 @@ function renderProgress() {
   elements.todayDoneCount.textContent = done;
 }
 
+function renderPlaytime() {
+  const minutes = Math.max(0, Math.min(60, Number(state.genshinPlaytime?.minutes) || 0));
+  const percent = Math.round(minutes / 60 * 100);
+  elements.genshinMinutes.textContent = minutes;
+  elements.genshinProgressBar.style.width = `${percent}%`;
+  elements.playtimeTrack.setAttribute("aria-valuenow", String(minutes));
+}
+
 function renderVisibility() {
   const showingProjects = activeView === "projects";
   elements.timelineView.hidden = showingProjects;
@@ -245,7 +256,7 @@ function fitPrimogemCount() {
 }
 window.addEventListener("resize", fitPrimogemCount);
 document.fonts.ready.then(fitPrimogemCount);
-function render() { document.querySelector("#primogemCount").textContent = state.primogems.toLocaleString("zh-TW"); fitPrimogemCount(); renderTasks(); if (activeView === "projects") renderProjects(); renderProgress(); renderVisibility(); }
+function render() { document.querySelector("#primogemCount").textContent = state.primogems.toLocaleString("zh-TW"); fitPrimogemCount(); renderTasks(); if (activeView === "projects") renderProjects(); renderProgress(); renderPlaytime(); renderVisibility(); }
 
 function mutateTask(id, projectId, mutation) {
   if (projectId) {

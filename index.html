@@ -62,6 +62,18 @@
       安裝任務 App
     </button>
 
+    <section class="playtime-panel" aria-labelledby="playtimeTitle">
+      <div>
+        <p class="section-label">GENSHIN TIME</p>
+        <h2 id="playtimeTitle">原神遊玩時間</h2>
+      </div>
+      <div class="playtime-summary"><strong id="genshinMinutes">0</strong><span>/ 60 分鐘</span></div>
+      <div class="playtime-track" role="progressbar" aria-label="原神遊玩時間" aria-valuemin="0" aria-valuemax="60" aria-valuenow="0">
+        <i id="genshinProgressBar"></i>
+      </div>
+      <p class="playtime-note">完成 1 個任務 +5 分鐘，每天早上 5 點重置。</p>
+    </section>
+
     <section class="task-section tab-view" id="timelineView" aria-labelledby="taskTitle">
       <div class="section-heading period-heading">
         <div><p class="section-label">MY TIMELINE</p><h2 id="taskTitle">時間任務</h2></div>
