@@ -1,9 +1,10 @@
-const CACHE_NAME = "task-planner-v21-recurring-due-history";
+const CACHE_NAME = "task-planner-v22-incomplete-rollover";
 const APP_SHELL = [
   "./fonts/HYWenHei-Extended.ttf",
   "./",
   "./index.html",
   "./history.html",
+  "./incomplete.html",
   "./styles.css",
   "./design.css",
   "./theme.css",
@@ -11,6 +12,7 @@ const APP_SHELL = [
   "./app.js",
   "./task-state.js",
   "./history.js",
+  "./incomplete.js",
   "./firebase-config.js",
   "./firebase-sync.js",
   "./manifest.webmanifest",

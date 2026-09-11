@@ -199,6 +199,7 @@ footer { margin-top: 32px; font-size: 13px; }
 .history-item { grid-template-columns: 38px minmax(0, 1fr) auto auto; }
 .restore-task { min-height: 44px; padding: 10px 14px; border: 1px solid #b9cbbb; border-radius: 10px; background: #edf3e9; color: var(--ink); cursor: pointer; font-size: 14px; font-weight: 600; }
 .restore-task:hover { background: #e0ebdb; }
+.unfinished-check { display: grid; place-items: center; color: #fff; background: #c92b37; border-radius: 50%; font-weight: 800; }
 @media (max-width: 560px) {
   .history-item { grid-template-columns: 32px minmax(0, 1fr) auto; gap: 10px; }
   .restore-task { grid-column: 3; grid-row: 1 / span 2; padding: 10px; }

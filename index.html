@@ -45,6 +45,10 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2"/></svg>
         歷史完成
       </a>
+      <a class="history-link" href="incomplete.html">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v5l3 2M4 6h16M6 6l1 14h10l1-14"/></svg>
+        未完成
+      </a>
     </nav>
     <nav class="period-tabs main-tabs" id="periodTabs" aria-label="任務頁面">
       <button class="period-tab active" type="button" data-view="daily" aria-selected="true"><span>今日</span><small>0</small></button>
@@ -70,7 +74,7 @@
         </div>
         <form class="quick-form" id="taskForm" hidden>
           <label><span>任務名稱</span><input id="taskName" maxlength="40" placeholder="例如：散步 20 分鐘" required></label>
-          <label><span>任務類型</span><select id="taskType"><option value="once">一次性任務</option><option value="recurring">循環性任務（每天早上 5 點重置）</option></select></label>
+          <label><span>任務類型</span><select id="taskType"><option value="once">一次性任務</option><option value="recurring">循環性任務（每天早上 12 點重置）</option></select></label>
           <label><span>循環頻率</span><select id="taskRecurrence"><option value="daily">每日循環</option><option value="monthly">每月循環</option><option value="yearly">每年循環</option></select></label>
           <label><span>截止日期（選填）</span><input id="taskDueDate" type="date"></label>
           <label><span>截止時間（選填）</span><input id="taskDueTime" type="time"></label>

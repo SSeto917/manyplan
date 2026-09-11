@@ -1,22 +1,75 @@
 /* Shared completion / restoration rules for the task and history pages. */
 window.PlannerTasks = (() => {
   const newId = () => `history-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
+  const periodNames = { daily: '今日', weekly: '本周', monthly: '本月', yearly: '今年' };
   function pending(task) {
     const copy = { ...task, done: false };
     delete copy.completionHistoryId;
     delete copy.completedAt;
     return copy;
   }
+  function dateKey(date) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  }
+  function sundayKey(date) {
+    const copy = new Date(date);
+    copy.setHours(0, 0, 0, 0);
+    copy.setDate(copy.getDate() - copy.getDay());
+    return dateKey(copy);
+  }
+  function monthKey(date) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+  }
   function nextResetAt(entry) {
     const completedAt = new Date(entry.completedAt);
     if (!Number.isFinite(completedAt.getTime())) return null;
     const resetAt = new Date(completedAt);
-    resetAt.setHours(5, 0, 0, 0);
+    resetAt.setHours(0, 0, 0, 0);
     const recurrence = entry.recurrence || entry.taskSnapshot?.recurrence || 'daily';
     if (recurrence === 'monthly') resetAt.setMonth(resetAt.getMonth() + 1);
     else if (recurrence === 'yearly') resetAt.setFullYear(resetAt.getFullYear() + 1);
     else if (resetAt <= completedAt) resetAt.setDate(resetAt.getDate() + 1);
     return resetAt;
+  }
+  function incompleteEntry(task, period, index, now) {
+    return {
+      id: newId(), taskId: task.id, title: task.title, period,
+      taskType: task.taskType || 'once', recurrence: task.recurrence || 'daily',
+      taskSnapshot: pending(task), originalIndex: index,
+      missedAt: now.toISOString()
+    };
+  }
+  function rolloverKeys(now) {
+    return { daily: dateKey(now), weekly: sundayKey(now), monthly: monthKey(now) };
+  }
+  function applyPeriodRollover(state, now) {
+    if (!Array.isArray(state.incomplete)) state.incomplete = [];
+    if (!state.rolloverApplied || typeof state.rolloverApplied !== 'object') {
+      state.rolloverApplied = rolloverKeys(now);
+      return;
+    }
+    const keys = rolloverKeys(now);
+    let changed = false;
+    ['daily', 'weekly', 'monthly'].forEach(period => {
+      if (state.rolloverApplied[period] === keys[period]) return;
+      const remaining = [];
+      state.tasks.forEach((task, index) => {
+        if (task.period !== period) {
+          remaining.push(task);
+          return;
+        }
+        if (task.taskType === 'recurring') {
+          remaining.push(pending(task));
+          changed = true;
+          return;
+        }
+        state.incomplete.push(incompleteEntry(task, period, index, now));
+        changed = true;
+      });
+      state.tasks = remaining;
+      state.rolloverApplied[period] = keys[period];
+    });
+    if (changed) state.clientUpdatedAt = now.toISOString();
   }
   function entryFor(task, project, index, reward = 0) {
     return {
@@ -33,6 +86,7 @@ window.PlannerTasks = (() => {
   function normalize(state, now = new Date()) {
     if (!state || !Array.isArray(state.tasks) || !Array.isArray(state.projects)) return null;
     if (!Array.isArray(state.history)) state.history = [];
+    if (!Array.isArray(state.incomplete)) state.incomplete = [];
     state.primogems = Number.isSafeInteger(state.primogems) && state.primogems >= 0 ? state.primogems : 0;
     function migrate(list, project) {
       list.forEach((task, index) => {
@@ -60,11 +114,13 @@ window.PlannerTasks = (() => {
       if (!resetAt) return;
       if (now < resetAt) return;
       entry.resetProcessed = true;
+      state.clientUpdatedAt = now.toISOString();
       const project = entry.projectId ? state.projects.find(item => item.id === entry.projectId) : null;
       if (entry.projectId && !project) return;
       const list = project ? project.tasks : state.tasks;
       if (!list.some(task => task.id === entry.taskId)) list.push(pending(entry.taskSnapshot));
     });
+    applyPeriodRollover(state, now);
     return state;
   }
   function complete(state, taskId, projectId) {
@@ -82,7 +138,7 @@ window.PlannerTasks = (() => {
     const index = state.history.findIndex(entry => entry.id === historyId);
     if (index < 0) return { ok: false, message: '這筆紀錄已恢復，請查看任務清單。' };
     const entry = state.history[index];
-    if (entry.resetProcessed) return { ok: false, message: '這次循環已於早上 5 點重置，請查看任務清單。' };
+    if (entry.resetProcessed) return { ok: false, message: '這次循環已於早上 12 點重置，請查看任務清單。' };
     const isProject = entry.source === 'project' || Boolean(entry.projectId);
     let project = isProject ? state.projects.find(item => item.id === entry.projectId) : null;
     if (isProject && !project) {
@@ -101,5 +157,19 @@ window.PlannerTasks = (() => {
     state.primogems = Math.max(0, state.primogems - refund);
     return { ok: true, message: `已恢復至${project ? project.name : { daily: '今日', weekly: '本周', monthly: '本月', yearly: '今年' }[task.period] || '任務'}${refund ? '，並扣回 20 原石' : ''}。` };
   }
-  return { normalize, complete, restore };
+  function restoreIncomplete(state, incompleteId) {
+    const index = state.incomplete.findIndex(entry => entry.id === incompleteId);
+    if (index < 0) return { ok: false, message: '這筆未完成紀錄已恢復，請查看任務清單。' };
+    const entry = state.incomplete[index];
+    if (state.tasks.some(task => task.id === entry.taskId)) return { ok: false, message: '同一個任務已在任務清單中。' };
+    const task = pending(entry.taskSnapshot || {
+      id: entry.taskId || newId(), title: entry.title || '未命名任務',
+      period: entry.period || 'daily', taskType: entry.taskType || 'once', recurrence: entry.recurrence || 'daily'
+    });
+    task.period = entry.period || task.period || 'daily';
+    state.tasks.splice(Number.isInteger(entry.originalIndex) ? Math.max(0, Math.min(entry.originalIndex, state.tasks.length)) : state.tasks.length, 0, task);
+    state.incomplete.splice(index, 1);
+    return { ok: true, message: `已移回${periodNames[task.period] || '任務'}。` };
+  }
+  return { normalize, complete, restore, restoreIncomplete };
 })();

@@ -464,7 +464,7 @@ function scheduleDailyReset() {
   if (document.hidden) return;
   const now = new Date();
   const next = new Date(now);
-  next.setHours(5, 0, 0, 0);
+  next.setHours(0, 0, 0, 0);
   if (next <= now) next.setDate(next.getDate() + 1);
   resetTimer = setTimeout(refreshSavedTasks, next - now + 100);
 }

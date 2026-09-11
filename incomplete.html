@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f3f4ef">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>未完成｜今天也前進一點點</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/app-icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="design.css">
+  <link rel="stylesheet" href="theme.css">
+  <script src="theme.js"></script>
+</head>
+<body>
+  <main class="page-shell history-page">
+    <nav class="history-nav">
+      <a href="index.html">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg>
+        返回任務計畫
+      </a>
+      <button class="theme-toggle" type="button" data-theme-toggle>☾ 深色模式</button>
+    </nav>
+
+    <header class="history-hero">
+      <div>
+        <p class="eyebrow">UNFINISHED</p>
+        <h1>未完成<span>。</span></h1>
+        <p>週期結束時還沒完成的一次性任務，會先放在這裡。</p>
+      </div>
+      <div class="history-total"><strong id="incompleteCount">0</strong><span>件未完成</span></div>
+    </header>
+
+    <nav class="history-tabs" id="incompleteTabs" aria-label="未完成分類">
+      <button class="active" type="button" data-incomplete-filter="daily" aria-selected="true">今日 <small>0</small></button>
+      <button type="button" data-incomplete-filter="weekly" aria-selected="false">本周 <small>0</small></button>
+      <button type="button" data-incomplete-filter="monthly" aria-selected="false">本月 <small>0</small></button>
+    </nav>
+
+    <section class="history-content" aria-labelledby="incompleteTitle">
+      <div class="section-heading">
+        <div><p class="section-label" id="incompleteLabel">TODAY'S UNFINISHED</p><h2 id="incompleteTitle">今日未完成</h2></div>
+      </div>
+      <p class="restore-hint">需要繼續做的任務，可以按「移回任務」。</p>
+      <p id="incompleteStatus" class="restore-status" role="status"></p>
+      <div class="history-list" id="incompleteList"></div>
+      <div class="empty-state history-empty" id="incompleteEmpty" hidden>
+        <span>○</span><p>沒有未完成任務</p><small id="incompleteEmptyHint">今日任務清空後，未完成的一次性任務會出現在這裡。</small>
+      </div>
+    </section>
+
+    <footer><p class="footer-note">沒有完成也沒關係，先收好，下一步再接回來。</p></footer>
+  </main>
+  <script src="task-state.js"></script>
+  <script src="incomplete.js"></script>
+  <script src="firebase-config.js"></script>
+  <script type="module" src="firebase-sync.js"></script>
+</body>
+</html>
