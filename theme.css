@@ -132,3 +132,5 @@
 [data-theme="dark"] .subtask-item input:checked + span { color: #9bad9f; }
 [data-theme="dark"] .subtask-form input { background: #111a18; color: #f1f6ed; border-color: #526a5a; }
 [data-theme="dark"] .subtask-form button { background: #376b51; border-color: #739582; color: #fff; }
+[data-theme="dark"] .question-search input { background: #18241e; color: #f1f6ed; border-color: #526a5a; }
+[data-theme="dark"] .question-keywords span { color: #ddc38c; background: #2f2a1d; border-color: #7d6a35; }

@@ -1,4 +1,4 @@
-const CACHE_NAME = "task-planner-v40-subtasks";
+const CACHE_NAME = "task-planner-v41-question-keyword-search";
 const APP_SHELL = [
   "./fonts/HYWenHei-Extended.ttf",
   "./",

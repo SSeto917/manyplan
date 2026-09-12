@@ -113,6 +113,9 @@ window.PlannerTasks = (() => {
     state.questionBank.questions.forEach(question => {
       question.answerCount = Number.isSafeInteger(question.answerCount) && question.answerCount >= 0 ? question.answerCount : 0;
       question.explanation = String(question.explanation || '').trim();
+      question.keywords = Array.isArray(question.keywords)
+        ? question.keywords.map(keyword => String(keyword).trim()).filter(Boolean)
+        : String(question.keywords || '').split(/[,\s，、#]+/).map(keyword => keyword.trim()).filter(Boolean);
     });
     if (!state.challenge || typeof state.challenge !== 'object') state.challenge = { enabled: false, penalties: {} };
     state.challenge.enabled = Boolean(state.challenge.enabled);

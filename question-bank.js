@@ -4,11 +4,13 @@ const elements = {
   count: document.querySelector("#questionCount"), tabs: document.querySelector("#subjectTabs"),
   form: document.querySelector("#questionForm"), subjectSelect: document.querySelector("#questionSubjectSelect"),
   newSubjectField: document.querySelector("#newSubjectField"), subject: document.querySelector("#questionSubject"),
-  answer: document.querySelector("#questionAnswer"), raw: document.querySelector("#questionRaw"), explanation: document.querySelector("#questionExplanation"),
+  answer: document.querySelector("#questionAnswer"), keywords: document.querySelector("#questionKeywords"),
+  raw: document.querySelector("#questionRaw"), explanation: document.querySelector("#questionExplanation"),
   preview: document.querySelector("#questionPreview"), status: document.querySelector("#questionStatus"), clear: document.querySelector("#clearQuestionForm"),
   list: document.querySelector("#questionList"), empty: document.querySelector("#questionEmpty"), label: document.querySelector("#questionListLabel"), title: document.querySelector("#questionListTitle"),
   toolbar: document.querySelector("#practiceToolbar"), progress: document.querySelector("#questionProgress"),
-  prev: document.querySelector("#prevQuestion"), next: document.querySelector("#nextQuestion"), random: document.querySelector("#randomQuestion")
+  prev: document.querySelector("#prevQuestion"), next: document.querySelector("#nextQuestion"), random: document.querySelector("#randomQuestion"),
+  search: document.querySelector("#questionSearch")
 };
 
 let activeSubject = "all";
@@ -40,6 +42,7 @@ function ensureQuestionBank(state) {
   state.questionBank.questions.forEach((question) => {
     question.answerCount = Number.isSafeInteger(question.answerCount) && question.answerCount >= 0 ? question.answerCount : 0;
     question.explanation = String(question.explanation || "").trim();
+    question.keywords = normalizeKeywords(question.keywords);
   });
   return state.questionBank;
 }
@@ -52,6 +55,11 @@ function saveState(state) {
 
 function normalizeSubject(value) {
   return String(value || "").trim().replace(/\s+/g, " ") || "未分類";
+}
+
+function normalizeKeywords(value) {
+  if (Array.isArray(value)) return value.map((item) => String(item).trim()).filter(Boolean);
+  return String(value || "").split(/[,\s，、#]+/).map((item) => item.trim()).filter(Boolean);
 }
 
 function parseQuestion(rawText) {
@@ -126,7 +134,20 @@ function selectedSubject() {
 }
 
 function filteredQuestions(bank) {
-  return activeSubject === "all" ? bank.questions : bank.questions.filter((question) => normalizeSubject(question.subject) === activeSubject);
+  const query = String(elements.search?.value || "").trim().toLowerCase();
+  return bank.questions.filter((question) => {
+    const subjectMatched = activeSubject === "all" || normalizeSubject(question.subject) === activeSubject;
+    if (!subjectMatched) return false;
+    if (!query) return true;
+    const haystack = [
+      question.subject,
+      question.stem,
+      question.explanation,
+      ...(question.keywords || []),
+      ...(question.options || []).map((option) => option.text)
+    ].join(" ").toLowerCase();
+    return haystack.includes(query);
+  });
 }
 
 function clampActiveIndex(total) {
@@ -142,6 +163,7 @@ function renderQuestionCard(question, index, total) {
     <article class="question-card" data-id="${escapeHTML(question.id)}">
       <div class="question-card-head"><span>${escapeHTML(question.subject)}</span><small>第 ${index + 1} / ${total} 題</small></div>
       <div class="question-stats"><span>已回答 ${Number(question.answerCount) || 0} 次</span></div>
+      ${(question.keywords || []).length ? `<div class="question-keywords">${question.keywords.map((keyword) => `<span>#${escapeHTML(keyword)}</span>`).join("")}</div>` : ""}
       <h3>${escapeHTML(question.stem)}</h3>
       ${question.answer ? "" : `<p class="answer-result missing">這題還沒有設定正確答案，請刪除後重新加入。</p>`}
       <div class="question-options practice-options">
@@ -178,7 +200,8 @@ function render() {
   const filtered = filteredQuestions(bank);
   clampActiveIndex(filtered.length);
   elements.label.textContent = activeSubject === "all" ? "ALL SUBJECTS" : "SUBJECT";
-  elements.title.textContent = activeSubject === "all" ? "全部題目" : activeSubject;
+  const query = String(elements.search?.value || "").trim();
+  elements.title.textContent = query ? `搜尋結果：${query}` : activeSubject === "all" ? "全部題目" : activeSubject;
   elements.empty.hidden = filtered.length > 0;
   elements.toolbar.hidden = filtered.length === 0;
   elements.list.innerHTML = filtered.length ? renderQuestionCard(filtered[activeIndex], activeIndex, filtered.length) : "";
@@ -220,8 +243,9 @@ elements.form.addEventListener("submit", (event) => {
   }
   const subject = selectedSubject();
   const explanation = elements.explanation.value.trim();
+  const keywords = normalizeKeywords(elements.keywords.value);
   if (!bank.subjects.includes(subject)) bank.subjects.push(subject);
-  bank.questions.unshift({ id: createId(), subject, stem: parsed.stem, options: parsed.options, answer, explanation, answerCount: 0, createdAt: new Date().toISOString() });
+  bank.questions.unshift({ id: createId(), subject, stem: parsed.stem, options: parsed.options, answer, explanation, keywords, answerCount: 0, createdAt: new Date().toISOString() });
   activeSubject = subject;
   saveState(state);
   elements.form.reset();
@@ -234,6 +258,10 @@ elements.tabs.addEventListener("click", (event) => {
   const button = event.target.closest("button[data-subject]");
   if (!button) return;
   activeSubject = button.dataset.subject;
+  activeIndex = 0;
+  render();
+});
+elements.search.addEventListener("input", () => {
   activeIndex = 0;
   render();
 });

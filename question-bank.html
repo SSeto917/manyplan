@@ -42,6 +42,7 @@
         <label><span>科目標籤</span><select id="questionSubjectSelect" required></select></label>
         <label id="newSubjectField"><span>新增科目</span><input id="questionSubject" maxlength="24" placeholder="例如：行政學"></label>
         <label><span>正確答案</span><select id="questionAnswer" required><option value="">請選擇正確答案</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option></select></label>
+        <label><span>關鍵字（選填）</span><input id="questionKeywords" maxlength="80" placeholder="例如：行政學, 傳統理論, 科學管理"></label>
         <label class="question-paste-field"><span>貼上題目</span><textarea id="questionRaw" rows="9" placeholder="某機關的科長平時在管理各項業務時，十分強調透過科學化的管理原則，達到工作的效率與效能。 請問該科長的管理主張，與那一個時期的行政學理論學派相近？&#10;(A) 修正理論時期&#10;(B) 整合理論時期&#10;(C) 傳統理論時期&#10;(D) 新公共管理時期" required></textarea></label>
         <label class="question-explanation-field"><span>詳解（選填）</span><textarea id="questionExplanation" rows="5" placeholder="可以寫這題的觀念、為什麼答案是這個、其他選項錯在哪裡。"></textarea></label>
         <div class="question-preview" id="questionPreview" hidden></div>
@@ -54,6 +55,7 @@
       <div class="section-heading">
         <div><p class="section-label" id="questionListLabel">ALL SUBJECTS</p><h2 id="questionListTitle">全部題目</h2></div>
       </div>
+      <label class="question-search"><span>搜尋關鍵字</span><input id="questionSearch" type="search" placeholder="輸入關鍵字、題目文字或詳解"></label>
       <div class="practice-toolbar" id="practiceToolbar" hidden>
         <button class="text-button" id="prevQuestion" type="button">上一題</button>
         <span id="questionProgress">第 0 / 0 題</span>
