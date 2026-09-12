@@ -39,7 +39,9 @@ function formatDue(entry) {
   const task = entry.taskSnapshot || {};
   if (!task.dueDate && !task.dueTime) return "";
   let value = task.dueDate ? task.dueDate.replaceAll("-", "/") : "未定日期";
-  if (task.dueTime) value += ` ${task.dueTime}`;
+  const compact = String(task.dueTime || "").trim().replace(/[：:]/g, "");
+  const match = compact.match(/^([01]\d|2[0-3])([0-5]\d)$/);
+  if (match) value += ` ${match[1]}:${match[2]}`;
   return `・截止 ${value}`;
 }
 

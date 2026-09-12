@@ -597,7 +597,7 @@ footer {
   .project-header > .icon-button { grid-column: 3; grid-row: 1; align-self: start; }
   .project-progress { grid-column: 3; grid-row: 1; margin-top: 32px; }
   .project-task-form { grid-template-columns: minmax(0, 1fr) minmax(112px, auto); }
-  .project-task-form select, .project-task-form input[type="date"], .project-task-form input[type="time"] { grid-column: 1; min-height: 40px; }
+  .project-task-form select, .project-task-form input[type="date"], .project-task-form input[name="projectDueTime"] { grid-column: 1; min-height: 40px; }
   .project-task-form button { grid-column: 2; grid-row: 1 / span 4; }
 }
 

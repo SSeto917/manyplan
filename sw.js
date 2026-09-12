@@ -1,4 +1,4 @@
-const CACHE_NAME = "task-planner-v28-cloud-status-contrast";
+const CACHE_NAME = "task-planner-v31-due-time-compact";
 const APP_SHELL = [
   "./fonts/HYWenHei-Extended.ttf",
   "./",

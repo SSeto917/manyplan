@@ -89,7 +89,7 @@
           <label><span>任務類型</span><select id="taskType"><option value="once">一次性任務</option><option value="recurring">循環性任務（每天早上 12 點重置）</option></select></label>
           <label><span>循環頻率</span><select id="taskRecurrence"><option value="daily">每日循環</option><option value="monthly">每月循環</option><option value="yearly">每年循環</option></select></label>
           <label><span>截止日期（選填）</span><input id="taskDueDate" type="date"></label>
-          <label><span>截止時間（選填）</span><input id="taskDueTime" type="time"></label>
+          <label><span>截止時間（4 位數字，選填）</span><input id="taskDueTime" type="text" inputmode="numeric" maxlength="4" pattern="^([01]\d|2[0-3])[0-5]\d$" placeholder="2030" title="請輸入 4 位 24 小時制數字，例如 1205 或 2030"></label>
           <div class="form-actions"><button class="text-button" id="cancelTask" type="button">取消</button><button class="primary-button" type="submit">加入任務</button></div>
         </form>
         <div class="task-list" id="taskList"></div>

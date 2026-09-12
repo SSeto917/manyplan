@@ -74,6 +74,13 @@ function saveState(touch = true) {
 function getDateKey(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
+
+function normalizeDueTime(value) {
+  const text = String(value || "").trim();
+  const compact = text.replace(/[：:]/g, "");
+  const match = compact.match(/^([01]\d|2[0-3])([0-5]\d)$/);
+  return match ? `${match[1]}:${match[2]}` : "";
+}
 function createId(prefix) { return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`; }
 function createHistoryEntry(task, project) {
   return {
@@ -101,7 +108,8 @@ function recurrenceLabel(task) {
 function formatDue(task) {
   if (!task.dueDate && !task.dueTime) return "";
   let value = task.dueDate ? task.dueDate.replaceAll("-", "/") : "未定日期";
-  if (task.dueTime) value += ` ${task.dueTime}`;
+  const dueTime = normalizeDueTime(task.dueTime);
+  if (dueTime) value += ` ${dueTime}`;
   return `截止 ${value}`;
 }
 
@@ -197,7 +205,7 @@ function renderProjects() {
           <option value="yearly">每年循環</option>
         </select>
         <input name="projectDueDate" type="date" aria-label="截止日期">
-        <input name="projectDueTime" type="time" aria-label="截止時間">
+        <input name="projectDueTime" type="text" inputmode="numeric" maxlength="4" pattern="^([01]\d|2[0-3])[0-5]\d$" placeholder="2030" title="請輸入 4 位 24 小時制數字，例如 1205 或 2030" aria-label="截止時間，4 位數字">
         <button type="submit">加入</button>
       </form>
     </article>`;
@@ -385,7 +393,7 @@ elements.projectList.addEventListener("submit", (event) => {
   const taskType = allowedTypes.has(form.elements.projectTaskType.value) ? form.elements.projectTaskType.value : "once";
   const recurrence = ["daily", "monthly", "yearly"].includes(form.elements.projectTaskRecurrence.value) ? form.elements.projectTaskRecurrence.value : "daily";
   const dueDate = form.elements.projectDueDate.value;
-  const dueTime = form.elements.projectDueTime.value;
+  const dueTime = normalizeDueTime(form.elements.projectDueTime.value);
   if (!project || !title) return;
   project.tasks.push({ id: createId("project-task"), title, taskType, recurrence, dueDate, dueTime, isMilestone: taskType === "indicator", done: false });
   saveState(); render();
@@ -399,7 +407,7 @@ elements.taskForm.addEventListener("submit", (event) => {
   const taskType = document.querySelector("#taskType").value === "recurring" ? "recurring" : "once";
   const recurrence = ["daily", "monthly", "yearly"].includes(document.querySelector("#taskRecurrence").value) ? document.querySelector("#taskRecurrence").value : "daily";
   const dueDate = document.querySelector("#taskDueDate").value;
-  const dueTime = document.querySelector("#taskDueTime").value;
+  const dueTime = normalizeDueTime(document.querySelector("#taskDueTime").value);
   if (!title) return;
   state.tasks.push({ id: createId("task"), period: state.activePeriod, title, taskType, recurrence, dueDate, dueTime, done: false });
   elements.taskForm.reset(); elements.taskForm.hidden = true;
