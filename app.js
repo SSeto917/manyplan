@@ -42,10 +42,13 @@ elements.viewDoneName = document.querySelector("#viewDoneName");
 elements.genshinMinutes = document.querySelector("#genshinMinutes");
 elements.genshinProgressBar = document.querySelector("#genshinProgressBar");
 elements.playtimeTrack = document.querySelector(".playtime-track");
+elements.currentTime = document.querySelector("#currentTime");
+elements.challengeModeToggle = document.querySelector("#challengeModeToggle");
 
 let state = loadState();
 let activeView = "daily";
 let activeProjectId = state.projects[0]?.id || null;
+let lastChallengeCloudSync = 0;
 state.activePeriod = "daily";
 
 function cloneSeed() { return JSON.parse(JSON.stringify(seedState)); }
@@ -71,6 +74,15 @@ function saveState(touch = true) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   window.dispatchEvent(new CustomEvent("planner:state-saved"));
 }
+
+function saveChallengeState(now) {
+  state.clientUpdatedAt = now.toISOString();
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  if (now.getTime() - lastChallengeCloudSync >= 15000) {
+    lastChallengeCloudSync = now.getTime();
+    window.dispatchEvent(new CustomEvent("planner:state-saved"));
+  }
+}
 function getDateKey(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
@@ -80,6 +92,65 @@ function normalizeDueTime(value) {
   const compact = text.replace(/[：:]/g, "");
   const match = compact.match(/^([01]\d|2[0-3])([0-5]\d)$/);
   return match ? `${match[1]}:${match[2]}` : "";
+}
+
+function taskPenaltyKey(task, projectId = "") {
+  return projectId ? `project:${projectId}:${task.id}` : `task:${task.id}`;
+}
+
+function dueDateTime(task, now = new Date()) {
+  const dueTime = normalizeDueTime(task.dueTime);
+  if (!dueTime) return null;
+  const dateText = task.dueDate || getDateKey(now);
+  const due = new Date(`${dateText}T${dueTime}:00`);
+  return Number.isFinite(due.getTime()) ? due : null;
+}
+
+function penaltyStartMs(task, key, now) {
+  const due = dueDateTime(task, now);
+  if (!due || now <= due) return 0;
+  const lastPenaltyAt = state.challenge?.penalties?.[key]?.lastPenaltyAt;
+  const last = lastPenaltyAt ? new Date(lastPenaltyAt) : null;
+  const from = last && Number.isFinite(last.getTime()) && last > due ? last : due;
+  return Math.max(0, Math.floor((now - from) / 1000));
+}
+
+function collectPenaltyTargets() {
+  const targets = state.tasks.map((task) => ({ task, key: taskPenaltyKey(task) }));
+  state.projects.forEach((project) => {
+    (project.tasks || []).forEach((task) => targets.push({ task, key: taskPenaltyKey(task, project.id) }));
+  });
+  return targets.filter(({ task }) => normalizeDueTime(task.dueTime));
+}
+
+function applyChallengePenalty() {
+  if (!state.challenge?.enabled) return;
+  const now = new Date();
+  let totalPenalty = 0;
+  state.challenge.penalties ||= {};
+  collectPenaltyTargets().forEach(({ task, key }) => {
+    const seconds = penaltyStartMs(task, key, now);
+    if (seconds <= 0) return;
+    totalPenalty += seconds;
+    const record = state.challenge.penalties[key] || { total: 0 };
+    record.total = (Number(record.total) || 0) + seconds;
+    record.lastPenaltyAt = now.toISOString();
+    state.challenge.penalties[key] = record;
+  });
+  if (totalPenalty <= 0) return;
+  state.primogems = Math.max(0, state.primogems - totalPenalty);
+  saveChallengeState(now);
+  showPenaltyNotice(totalPenalty);
+  render();
+}
+
+let penaltyNoticeTimer;
+function showPenaltyNotice(amount) {
+  const notice = document.querySelector("#primogemNotice");
+  notice.textContent = `挑戰逾時，扣除 ${amount} 原石`;
+  notice.hidden = false;
+  window.clearTimeout(penaltyNoticeTimer);
+  penaltyNoticeTimer = window.setTimeout(() => { notice.hidden = true; }, 1600);
 }
 function createId(prefix) { return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`; }
 function createHistoryEntry(task, project) {
@@ -113,6 +184,25 @@ function formatDue(task) {
   return `截止 ${value}`;
 }
 
+function subtaskMarkup(task) {
+  const subtasks = Array.isArray(task.subtasks) ? task.subtasks : [];
+  const done = subtasks.filter((subtask) => subtask.done).length;
+  return `<div class="subtask-panel">
+    <div class="subtask-summary"><span>小任務</span><small>${done} / ${subtasks.length} 完成</small></div>
+    <div class="subtask-list">
+      ${subtasks.map((subtask) => `<label class="subtask-item">
+        <input type="checkbox" data-subtask-id="${escapeHTML(subtask.id)}" ${subtask.done ? "checked" : ""}>
+        <span>${escapeHTML(subtask.title)}</span>
+        <button class="delete-subtask" type="button" data-subtask-id="${escapeHTML(subtask.id)}" aria-label="刪除小任務 ${escapeHTML(subtask.title)}">×</button>
+      </label>`).join("")}
+    </div>
+    <form class="subtask-form">
+      <input name="subtaskTitle" maxlength="36" placeholder="新增更小的任務">
+      <button type="submit">加入</button>
+    </form>
+  </div>`;
+}
+
 function taskCard(task, index, type = "timeline", projectId = "") {
   const projectTypeLabel = task.taskType === "indicator"
     ? `<span class="task-type indicator">◆ 指標性任務</span>`
@@ -126,6 +216,7 @@ function taskCard(task, index, type = "timeline", projectId = "") {
     </button>
     <span class="task-text"><strong>${escapeHTML(task.title)}</strong><small>${note}</small></span>
     <button class="icon-button delete-task" type="button" aria-label="刪除 ${escapeHTML(task.title)}" title="刪除任務"><svg viewBox="0 0 24 24"><path d="M5 7h14M9 7V4h6v3M8 10v8M12 10v8M16 10v8M6.5 7l1 14h9l1-14"/></svg></button>
+    ${subtaskMarkup(task)}
   </article>`;
 }
 
@@ -264,7 +355,21 @@ function fitPrimogemCount() {
 }
 window.addEventListener("resize", fitPrimogemCount);
 document.fonts.ready.then(fitPrimogemCount);
-function render() { document.querySelector("#primogemCount").textContent = state.primogems.toLocaleString("zh-TW"); fitPrimogemCount(); renderTasks(); if (activeView === "projects") renderProjects(); renderProgress(); renderPlaytime(); renderVisibility(); }
+function renderChallengeMode() {
+  const enabled = Boolean(state.challenge?.enabled);
+  elements.challengeModeToggle.textContent = enabled ? "挑戰模式" : "普通模式";
+  elements.challengeModeToggle.setAttribute("aria-pressed", String(enabled));
+  elements.challengeModeToggle.classList.toggle("active", enabled);
+}
+
+function renderCurrentTime() {
+  const now = new Date();
+  const text = new Intl.DateTimeFormat("zh-TW", { hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23" }).format(now);
+  elements.currentTime.textContent = text;
+  elements.currentTime.dateTime = now.toISOString();
+}
+
+function render() { document.querySelector("#primogemCount").textContent = state.primogems.toLocaleString("zh-TW"); fitPrimogemCount(); renderTasks(); if (activeView === "projects") renderProjects(); renderProgress(); renderPlaytime(); renderChallengeMode(); renderCurrentTime(); renderVisibility(); }
 
 function mutateTask(id, projectId, mutation) {
   if (projectId) {
@@ -283,6 +388,75 @@ function toggleProjectTask(projectId, taskId) {
   if (!completed) return false;
   awardPrimogems();
   saveState(); render();
+  return true;
+}
+
+function taskFromCard(card) {
+  const projectId = card.dataset.projectId || "";
+  if (projectId) {
+    const project = state.projects.find((item) => item.id === projectId);
+    return { task: project?.tasks.find((item) => item.id === card.dataset.id), projectId };
+  }
+  return { task: state.tasks.find((item) => item.id === card.dataset.id), projectId: "" };
+}
+
+function maybeCompleteAfterSubtasks(task, projectId) {
+  const subtasks = Array.isArray(task?.subtasks) ? task.subtasks : [];
+  if (subtasks.length === 0 || subtasks.some((subtask) => !subtask.done)) return false;
+  const completed = window.PlannerTasks.complete(state, task.id, projectId);
+  if (!completed) return false;
+  awardPrimogems();
+  saveState();
+  render();
+  launchConfetti();
+  return true;
+}
+
+function showSubtaskNotice() {
+  const notice = document.querySelector("#primogemNotice");
+  notice.textContent = "請先完成全部小任務";
+  notice.hidden = false;
+  window.clearTimeout(rewardNoticeTimer);
+  rewardNoticeTimer = window.setTimeout(() => { notice.hidden = true; }, 1800);
+}
+
+function handleSubtaskClick(event) {
+  const card = event.target.closest(".task-card");
+  if (!card) return false;
+  const { task, projectId } = taskFromCard(card);
+  if (!task) return false;
+  if (event.target.matches(".subtask-item input[type='checkbox']")) {
+    const subtask = task.subtasks.find((item) => item.id === event.target.dataset.subtaskId);
+    if (!subtask) return true;
+    subtask.done = event.target.checked;
+    if (!maybeCompleteAfterSubtasks(task, projectId)) {
+      saveState();
+      render();
+    }
+    return true;
+  }
+  const deleteButton = event.target.closest(".delete-subtask");
+  if (deleteButton) {
+    task.subtasks = task.subtasks.filter((item) => item.id !== deleteButton.dataset.subtaskId);
+    saveState();
+    render();
+    return true;
+  }
+  return false;
+}
+
+function handleSubtaskSubmit(event) {
+  const form = event.target.closest(".subtask-form");
+  if (!form) return false;
+  event.preventDefault();
+  const card = form.closest(".task-card");
+  const { task } = taskFromCard(card);
+  const title = form.elements.subtaskTitle.value.trim();
+  if (!task || !title) return true;
+  task.subtasks ||= [];
+  task.subtasks.push({ id: createId("subtask"), title, done: false });
+  saveState();
+  render();
   return true;
 }
 
@@ -315,12 +489,26 @@ elements.periodTabs.addEventListener("click", (event) => {
   render();
 });
 
+elements.challengeModeToggle.addEventListener("click", () => {
+  state.challenge ||= { enabled: false, penalties: {} };
+  state.challenge.enabled = !state.challenge.enabled;
+  if (!state.challenge.enabled) state.challenge.penalties ||= {};
+  saveState();
+  render();
+});
+
 elements.taskList.addEventListener("click", (event) => {
+  if (handleSubtaskClick(event)) return;
   const card = event.target.closest(".task-card");
   if (!card) return;
   if (event.target.closest(".delete-task")) {
     mutateTask(card.dataset.id, "", (_task, list) => list.splice(list.findIndex((item) => item.id === card.dataset.id), 1));
   } else if (event.target.closest(".task-toggle")) {
+    const { task } = taskFromCard(card);
+    if (task?.subtasks?.some((subtask) => !subtask.done)) {
+      showSubtaskNotice();
+      return;
+    }
     if (window.PlannerTasks.complete(state, card.dataset.id)) {
       awardPrimogems();
       saveState(); render();
@@ -328,18 +516,27 @@ elements.taskList.addEventListener("click", (event) => {
     }
   }
 });
+elements.taskList.addEventListener("submit", handleSubtaskSubmit);
 
 elements.projectRecurringList.addEventListener("click", (event) => {
+  if (handleSubtaskClick(event)) return;
   const card = event.target.closest(".task-card");
   if (!card) return;
   if (event.target.closest(".delete-task")) {
     mutateTask(card.dataset.id, card.dataset.projectId, (_task, list) => list.splice(list.findIndex((item) => item.id === card.dataset.id), 1));
   } else if (event.target.closest(".task-toggle")) {
+    const { task } = taskFromCard(card);
+    if (task?.subtasks?.some((subtask) => !subtask.done)) {
+      showSubtaskNotice();
+      return;
+    }
     if (toggleProjectTask(card.dataset.projectId, card.dataset.id)) launchConfetti();
   }
 });
+elements.projectRecurringList.addEventListener("submit", handleSubtaskSubmit);
 
 elements.projectList.addEventListener("click", (event) => {
+  if (handleSubtaskClick(event)) return;
   const projectTab = event.target.closest(".project-selector-tab");
   if (projectTab) {
     activeProjectId = projectTab.dataset.projectTabId;
@@ -368,11 +565,17 @@ elements.projectList.addEventListener("click", (event) => {
   } else if (task && event.target.closest(".delete-task")) {
     mutateTask(task.dataset.id, projectCard.dataset.projectId, (_item, list) => list.splice(list.findIndex((item) => item.id === task.dataset.id), 1));
   } else if (task && event.target.closest(".task-toggle")) {
+    const { task: targetTask } = taskFromCard(task);
+    if (targetTask?.subtasks?.some((subtask) => !subtask.done)) {
+      showSubtaskNotice();
+      return;
+    }
     if (toggleProjectTask(projectCard.dataset.projectId, task.dataset.id)) launchConfetti();
   }
 });
 
 elements.projectList.addEventListener("submit", (event) => {
+  if (handleSubtaskSubmit(event)) return;
   const goalForm = event.target.closest(".goal-form");
   if (goalForm) {
     event.preventDefault();
@@ -471,6 +674,10 @@ loginForm.addEventListener("submit", (event) => event.preventDefault());
 
 saveState(false);
 render();
+setInterval(() => {
+  renderCurrentTime();
+  applyChallengePenalty();
+}, 1000);
 
 // Refresh when history restores a task in another tab or from the back-forward cache.
 function refreshSavedTasks() { state = loadState(); saveState(false); render(); scheduleDailyReset(); }

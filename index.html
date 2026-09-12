@@ -18,6 +18,10 @@
 </head>
 <body>
   <main class="page-shell">
+    <div class="top-hud" aria-label="目前狀態">
+      <time class="current-time" id="currentTime" datetime="">--:--:--</time>
+      <button class="mode-toggle" id="challengeModeToggle" type="button" aria-pressed="false">普通模式</button>
+    </div>
     <header class="planner-masthead">
     <div class="primogem-toolbar">
       <div class="primogem-wallet" aria-label="原石餘額">
@@ -48,6 +52,10 @@
       <a class="history-link" href="incomplete.html">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v5l3 2M4 6h16M6 6l1 14h10l1-14"/></svg>
         未完成
+      </a>
+      <a class="history-link" href="question-bank.html">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM8 9h8M8 13h5M6 5v14"/></svg>
+        題庫
       </a>
     </nav>
     <nav class="period-tabs main-tabs" id="periodTabs" aria-label="任務頁面">
@@ -136,7 +144,6 @@
       <label><span>密碼</span><input id="loginPassword" type="password" minlength="6" autocomplete="current-password" required></label>
       <p class="login-message" id="loginMessage" role="status"></p>
       <button class="login-submit" id="loginSubmit" type="submit">登入</button>
-      <button class="switch-auth-mode" id="switchAuthMode" type="button">還沒有帳號？建立帳號</button>
     </form>
   </dialog>
   <div class="celebration" id="celebration" aria-live="polite"></div>

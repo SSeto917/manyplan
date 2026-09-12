@@ -1,10 +1,11 @@
-const CACHE_NAME = "task-planner-v31-due-time-compact";
+const CACHE_NAME = "task-planner-v40-subtasks";
 const APP_SHELL = [
   "./fonts/HYWenHei-Extended.ttf",
   "./",
   "./index.html",
   "./history.html",
   "./incomplete.html",
+  "./question-bank.html",
   "./styles.css",
   "./design.css",
   "./theme.css",
@@ -13,6 +14,7 @@ const APP_SHELL = [
   "./task-state.js",
   "./history.js",
   "./incomplete.js",
+  "./question-bank.js",
   "./firebase-config.js",
   "./firebase-sync.js",
   "./manifest.webmanifest",

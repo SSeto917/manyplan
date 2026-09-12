@@ -1,0 +1,76 @@
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f3f4ef">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>題庫｜今天也前進一點點</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/app-icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="design.css">
+  <link rel="stylesheet" href="theme.css">
+  <script src="theme.js"></script>
+</head>
+<body>
+  <main class="page-shell history-page question-bank-page">
+    <nav class="history-nav">
+      <a href="index.html">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg>
+        返回任務計畫
+      </a>
+      <button class="theme-toggle" type="button" data-theme-toggle>☾ 深色模式</button>
+    </nav>
+
+    <header class="history-hero question-hero">
+      <div>
+        <p class="eyebrow">QUESTION BANK</p>
+        <h1>題庫<span>。</span></h1>
+        <p>貼上題目後會自動拆成 A、B、C、D 選項，並依科目標籤整理。</p>
+      </div>
+      <div class="history-total"><strong id="questionCount">0</strong><span>題</span></div>
+    </header>
+
+    <nav class="question-subject-tabs" id="subjectTabs" aria-label="科目分類"></nav>
+
+    <section class="question-editor" aria-labelledby="questionEditorTitle">
+      <div class="section-heading">
+        <div><p class="section-label">ADD QUESTION</p><h2 id="questionEditorTitle">新增題目</h2></div>
+      </div>
+      <form class="question-form" id="questionForm">
+        <label><span>科目標籤</span><select id="questionSubjectSelect" required></select></label>
+        <label id="newSubjectField"><span>新增科目</span><input id="questionSubject" maxlength="24" placeholder="例如：行政學"></label>
+        <label><span>正確答案</span><select id="questionAnswer" required><option value="">請選擇正確答案</option><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option></select></label>
+        <label class="question-paste-field"><span>貼上題目</span><textarea id="questionRaw" rows="9" placeholder="某機關的科長平時在管理各項業務時，十分強調透過科學化的管理原則，達到工作的效率與效能。 請問該科長的管理主張，與那一個時期的行政學理論學派相近？&#10;(A) 修正理論時期&#10;(B) 整合理論時期&#10;(C) 傳統理論時期&#10;(D) 新公共管理時期" required></textarea></label>
+        <label class="question-explanation-field"><span>詳解（選填）</span><textarea id="questionExplanation" rows="5" placeholder="可以寫這題的觀念、為什麼答案是這個、其他選項錯在哪裡。"></textarea></label>
+        <div class="question-preview" id="questionPreview" hidden></div>
+        <p class="restore-status" id="questionStatus" role="status"></p>
+        <div class="form-actions"><button class="text-button" id="clearQuestionForm" type="button">清空</button><button class="primary-button" type="submit">加入題庫</button></div>
+      </form>
+    </section>
+
+    <section class="history-content question-list-section" aria-labelledby="questionListTitle">
+      <div class="section-heading">
+        <div><p class="section-label" id="questionListLabel">ALL SUBJECTS</p><h2 id="questionListTitle">全部題目</h2></div>
+      </div>
+      <div class="practice-toolbar" id="practiceToolbar" hidden>
+        <button class="text-button" id="prevQuestion" type="button">上一題</button>
+        <span id="questionProgress">第 0 / 0 題</span>
+        <button class="text-button" id="randomQuestion" type="button">隨機</button>
+        <button class="primary-button" id="nextQuestion" type="button">下一題</button>
+      </div>
+      <div class="question-list single-question" id="questionList"></div>
+      <div class="empty-state history-empty" id="questionEmpty" hidden>
+        <span>?</span><p>還沒有題目</p><small>貼上一題題目，它會自動整理成選項卡片。</small>
+      </div>
+    </section>
+
+    <footer><p class="footer-note">科目越多，越適合用上方標籤快速切換。</p></footer>
+  </main>
+  <script src="task-state.js"></script>
+  <script src="question-bank.js"></script>
+  <script src="firebase-config.js"></script>
+  <script type="module" src="firebase-sync.js"></script>
+</body>
+</html>

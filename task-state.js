@@ -4,6 +4,7 @@ window.PlannerTasks = (() => {
   const periodNames = { daily: '今日', weekly: '本周', monthly: '本月', yearly: '今年' };
   function pending(task) {
     const copy = { ...task, done: false };
+    if (Array.isArray(copy.subtasks)) copy.subtasks = copy.subtasks.map(subtask => ({ ...subtask, done: false }));
     delete copy.completionHistoryId;
     delete copy.completedAt;
     return copy;
@@ -106,11 +107,27 @@ window.PlannerTasks = (() => {
     if (!state || !Array.isArray(state.tasks) || !Array.isArray(state.projects)) return null;
     if (!Array.isArray(state.history)) state.history = [];
     if (!Array.isArray(state.incomplete)) state.incomplete = [];
+    if (!state.questionBank || typeof state.questionBank !== 'object') state.questionBank = { subjects: [], questions: [] };
+    if (!Array.isArray(state.questionBank.subjects)) state.questionBank.subjects = [];
+    if (!Array.isArray(state.questionBank.questions)) state.questionBank.questions = [];
+    state.questionBank.questions.forEach(question => {
+      question.answerCount = Number.isSafeInteger(question.answerCount) && question.answerCount >= 0 ? question.answerCount : 0;
+      question.explanation = String(question.explanation || '').trim();
+    });
+    if (!state.challenge || typeof state.challenge !== 'object') state.challenge = { enabled: false, penalties: {} };
+    state.challenge.enabled = Boolean(state.challenge.enabled);
+    if (!state.challenge.penalties || typeof state.challenge.penalties !== 'object' || Array.isArray(state.challenge.penalties)) state.challenge.penalties = {};
     state.primogems = Number.isSafeInteger(state.primogems) && state.primogems >= 0 ? state.primogems : 0;
     normalizePlaytime(state, now);
     function migrate(list, project) {
       list.forEach((task, index) => {
         if (project) task.taskType = task.isMilestone ? 'indicator' : task.taskType || 'once';
+        if (!Array.isArray(task.subtasks)) task.subtasks = [];
+        task.subtasks = task.subtasks.map(subtask => ({
+          id: subtask.id || newId(),
+          title: String(subtask.title || '').trim() || '未命名小任務',
+          done: Boolean(subtask.done)
+        }));
         if (!task.done) return;
         const existing = state.history.find(entry => task.completionHistoryId
           ? entry.id === task.completionHistoryId
@@ -149,6 +166,8 @@ window.PlannerTasks = (() => {
     const list = project ? project.tasks : state.tasks;
     const index = list.findIndex(task => task.id === taskId);
     if (index < 0) return false;
+    const subtasks = Array.isArray(list[index].subtasks) ? list[index].subtasks : [];
+    if (subtasks.length > 0 && subtasks.some(subtask => !subtask.done)) return false;
     state.history.push(entryFor(list[index], project, index, 20));
     list.splice(index, 1);
     state.primogems += 20;

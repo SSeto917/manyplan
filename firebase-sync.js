@@ -7,14 +7,13 @@ const elements = {
   email: document.querySelector("#loginEmail"), password: document.querySelector("#loginPassword"),
   title: document.querySelector("#loginTitle"), description: document.querySelector("#loginDescription"),
   message: document.querySelector("#loginMessage"), submit: document.querySelector("#loginSubmit"),
-  switchMode: document.querySelector("#switchAuthMode"), status: document.querySelector("#cloudStatus"),
+  status: document.querySelector("#cloudStatus"),
   save: document.querySelector("#saveToCloud"), logout: document.querySelector("#logoutButton")
 };
 
 let auth = null;
 let db = null;
 let currentUser = null;
-let authMode = "login";
 let firebaseApi = null;
 let unsubscribeSave = null;
 let saveTimer = null;
@@ -158,23 +157,13 @@ function friendlyError(error) {
   return messages[error?.code] || "操作失敗，請確認網路與 Firebase 設定。";
 }
 
-function updateAuthMode() {
-  if (!elements.title || !elements.description || !elements.submit || !elements.switchMode || !elements.password) return;
-  const registering = authMode === "register";
-  elements.title.textContent = registering ? "建立雲端帳號" : "登入雲端存檔";
-  elements.description.textContent = registering ? "建立帳號後即可將所有任務存入 Firebase。" : "登入後可將目前所有內容安全存入自己的帳號。";
-  elements.submit.textContent = registering ? "建立帳號" : "登入";
-  elements.switchMode.textContent = registering ? "已經有帳號？返回登入" : "還沒有帳號？建立帳號";
-  elements.password.autocomplete = registering ? "new-password" : "current-password";
+function updateLoginText() {
+  if (!elements.title || !elements.description || !elements.submit || !elements.password) return;
+  elements.title.textContent = "登入雲端存檔";
+  elements.description.textContent = "登入後可將目前所有內容安全存入自己的帳號。";
+  elements.submit.textContent = "登入";
+  elements.password.autocomplete = "current-password";
   showMessage("");
-}
-
-if (elements.switchMode) {
-  elements.switchMode.addEventListener("click", () => {
-    if (!firebaseApi) return;
-    authMode = authMode === "login" ? "register" : "login";
-    updateAuthMode();
-  });
 }
 
 if (elements.form) {
@@ -185,10 +174,9 @@ if (elements.form) {
       return;
     }
     elements.submit.disabled = true;
-    showMessage(authMode === "register" ? "正在建立帳號…" : "正在登入…");
+    showMessage("正在登入…");
     try {
-      if (authMode === "register") await firebaseApi.createUserWithEmailAndPassword(auth, elements.email.value.trim(), elements.password.value);
-      else await firebaseApi.signInWithEmailAndPassword(auth, elements.email.value.trim(), elements.password.value);
+      await firebaseApi.signInWithEmailAndPassword(auth, elements.email.value.trim(), elements.password.value);
       elements.form.reset();
       elements.dialog.close();
     } catch (error) {
@@ -224,7 +212,6 @@ if (!configured) {
   if (elements.title) elements.title.textContent = "尚未連接 Firebase";
   if (elements.description) elements.description.textContent = "請先在 firebase-config.js 填入你的 Firebase 專案設定。";
   if (elements.submit) elements.submit.disabled = true;
-  if (elements.switchMode) elements.switchMode.hidden = true;
 } else {
   initializeFirebase();
 }
@@ -244,6 +231,7 @@ async function initializeFirebase() {
     db = firestoreSdk.getFirestore(app);
     await authSdk.setPersistence(auth, authSdk.browserLocalPersistence);
     if (elements.submit) elements.submit.disabled = false;
+    updateLoginText();
     authSdk.onAuthStateChanged(auth, async (user) => {
       currentUser = user;
       if (elements.open) elements.open.hidden = Boolean(user);
