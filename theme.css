@@ -48,6 +48,7 @@
 [data-theme="dark"] .cloud-button,
 [data-theme="dark"] .theme-toggle,
 [data-theme="dark"] .project-selector-tab { background: #1b2922; color: var(--ink); border-color: var(--line); }
+[data-theme="dark"] .cloud-status { color: #f1f6ed; }
 [data-theme="dark"] button,
 [data-theme="dark"] .cloud-button,
 [data-theme="dark"] .text-button,

@@ -1,4 +1,4 @@
-const CACHE_NAME = "task-planner-v26-game-ui";
+const CACHE_NAME = "task-planner-v28-cloud-status-contrast";
 const APP_SHELL = [
   "./fonts/HYWenHei-Extended.ttf",
   "./",

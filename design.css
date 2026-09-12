@@ -36,8 +36,8 @@ button, a { touch-action: manipulation; }
 .primogem-toolbar { margin: 0 0 0 auto; flex-shrink: 0; max-width: 100%; }
 .primogem-wallet { box-shadow: none; max-width: 100%; box-sizing: border-box; }
 .primogem-count { min-width: 0; white-space: nowrap; }
-.cloud-toolbar { margin: 10px 0 24px; min-height: 44px; padding: 8px 10px; background: rgba(255,253,245,.66); border: 1px solid var(--line); border-radius: 999px; }
-.cloud-status { font-size: 12px; font-weight: 800; }
+.cloud-toolbar { width: fit-content; max-width: 100%; margin: 10px 0 24px auto; min-height: 44px; padding: 6px 8px 6px 14px; background: rgba(255,253,245,.66); border: 1px solid var(--line); border-radius: 999px; }
+.cloud-status { max-width: 180px; color: #18342e; font-size: 12px; font-weight: 900; }
 .cloud-button { min-height: 40px; background: var(--panel); border-radius: 999px; box-shadow: inset 0 0 0 1px rgba(216,188,110,.35); }
 .save-cloud-button { background: var(--green); }
 .period-tabs { border: 1px solid var(--panel-line); background: #dfe8e2; padding: 5px; border-radius: 18px; gap: 5px; box-shadow: inset 0 1px 0 rgba(255,255,255,.8); }
@@ -166,8 +166,8 @@ footer { margin-top: 32px; font-size: 13px; }
   .planner-brand p { font-size: 9px; letter-spacing: .09em; }
   .planner-brand h1 { font-size: 17px; letter-spacing: 0; }
   .primogem-wallet { min-width: 126px; gap: 6px; }
-  .cloud-toolbar { margin-bottom: 18px; gap: 6px; }
-  .cloud-status { max-width: 145px; margin-right: auto; }
+  .cloud-toolbar { margin: 8px 0 18px auto; gap: 6px; }
+  .cloud-status { max-width: 132px; margin-right: 0; }
   .main-tabs { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px; margin-bottom: 24px; overflow: visible; }
   .playtime-panel { grid-template-columns: 1fr; padding: 16px 12px; }
   .playtime-summary { justify-self: start; }
