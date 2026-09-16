@@ -1,7 +1,9 @@
 const STORAGE_KEY = "life-planner:v2";
+const QUESTION_BACKUP_KEY = "life-planner:question-bank-backups";
 
 const elements = {
   count: document.querySelector("#questionCount"), tabs: document.querySelector("#subjectTabs"),
+  genesisCount: document.querySelector("#genesisCrystalCount"), genesisProducts: document.querySelector("#genesisProducts"), genesisStatus: document.querySelector("#genesisShopStatus"),
   form: document.querySelector("#questionForm"), subjectSelect: document.querySelector("#questionSubjectSelect"),
   newSubjectField: document.querySelector("#newSubjectField"), subject: document.querySelector("#questionSubject"),
   answer: document.querySelector("#questionAnswer"), keywords: document.querySelector("#questionKeywords"),
@@ -12,6 +14,15 @@ const elements = {
   prev: document.querySelector("#prevQuestion"), next: document.querySelector("#nextQuestion"), random: document.querySelector("#randomQuestion"),
   search: document.querySelector("#questionSearch")
 };
+
+const genesisProducts = [
+  { id: "genesis-60", label: "60 創世結晶", cost: 60 },
+  { id: "genesis-330", label: "300 + 30 創世結晶", cost: 330 },
+  { id: "genesis-1090", label: "1090 創世結晶", cost: 1090 },
+  { id: "genesis-2240", label: "1980 + 260 創世結晶", cost: 2240 },
+  { id: "genesis-3880", label: "3280 + 600 創世結晶", cost: 3880 },
+  { id: "genesis-8080", label: "8080 創世結晶", cost: 8080 }
+];
 
 let activeSubject = "all";
 let activeIndex = 0;
@@ -36,6 +47,8 @@ function loadState() {
 }
 
 function ensureQuestionBank(state) {
+  state.genesisCrystals = Number.isSafeInteger(state.genesisCrystals) && state.genesisCrystals >= 0 ? state.genesisCrystals : 0;
+  if (!Array.isArray(state.shopPurchases)) state.shopPurchases = [];
   state.questionBank ||= { subjects: [], questions: [] };
   if (!Array.isArray(state.questionBank.subjects)) state.questionBank.subjects = [];
   if (!Array.isArray(state.questionBank.questions)) state.questionBank.questions = [];
@@ -47,7 +60,26 @@ function ensureQuestionBank(state) {
   return state.questionBank;
 }
 
+function backupQuestionData(state, reason = "question-save") {
+  if (!state) return;
+  try {
+    const bank = ensureQuestionBank(state);
+    const backups = JSON.parse(localStorage.getItem(QUESTION_BACKUP_KEY)) || [];
+    backups.unshift({
+      backedUpAt: new Date().toISOString(),
+      reason,
+      questionBank: JSON.parse(JSON.stringify(bank)),
+      genesisCrystals: Number(state.genesisCrystals) || 0,
+      shopPurchases: Array.isArray(state.shopPurchases) ? JSON.parse(JSON.stringify(state.shopPurchases)) : []
+    });
+    localStorage.setItem(QUESTION_BACKUP_KEY, JSON.stringify(backups.slice(0, 10)));
+  } catch (error) {
+    console.warn("Question bank backup failed", error);
+  }
+}
+
 function saveState(state) {
+  backupQuestionData(state, "question-save");
   state.clientUpdatedAt = new Date().toISOString();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   window.dispatchEvent(new CustomEvent("planner:state-saved", { detail: { immediate: true } }));
@@ -186,6 +218,13 @@ function render() {
   const state = loadState();
   if (!state) return;
   const bank = ensureQuestionBank(state);
+  elements.genesisCount.textContent = state.genesisCrystals.toLocaleString("zh-TW");
+  elements.genesisProducts.innerHTML = genesisProducts.map((product) => `
+    <button class="genesis-product" type="button" data-product-id="${escapeHTML(product.id)}" ${state.genesisCrystals < product.cost ? "disabled" : ""}>
+      <span>${escapeHTML(product.label)}</span>
+      <small>兌換需要 ${product.cost.toLocaleString("zh-TW")} 顆</small>
+    </button>
+  `).join("");
   const subjects = groupedSubjects(bank);
   if (activeSubject !== "all" && !subjects.includes(activeSubject)) activeSubject = "all";
   renderSubjectSelect(subjects);
@@ -246,12 +285,33 @@ elements.form.addEventListener("submit", (event) => {
   const keywords = normalizeKeywords(elements.keywords.value);
   if (!bank.subjects.includes(subject)) bank.subjects.push(subject);
   bank.questions.unshift({ id: createId(), subject, stem: parsed.stem, options: parsed.options, answer, explanation, keywords, answerCount: 0, createdAt: new Date().toISOString() });
+  state.genesisCrystals = (Number(state.genesisCrystals) || 0) + 1;
   activeSubject = subject;
   saveState(state);
   elements.form.reset();
   elements.preview.hidden = true;
   elements.preview.innerHTML = "";
-  elements.status.textContent = "已加入題庫。";
+  elements.status.textContent = "已加入題庫，獲得 1 創世結晶。";
+  render();
+});
+
+elements.genesisProducts.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-product-id]");
+  if (!button) return;
+  const product = genesisProducts.find((item) => item.id === button.dataset.productId);
+  if (!product) return;
+  const state = loadState();
+  if (!state) return;
+  ensureQuestionBank(state);
+  if (state.genesisCrystals < product.cost) {
+    elements.genesisStatus.textContent = "創世結晶不足。";
+    render();
+    return;
+  }
+  state.genesisCrystals -= product.cost;
+  state.shopPurchases.push({ id: createId("purchase"), productId: product.id, label: product.label, cost: product.cost, purchasedAt: new Date().toISOString() });
+  saveState(state);
+  elements.genesisStatus.textContent = `已兌換 ${product.label}。`;
   render();
 });
 elements.tabs.addEventListener("click", (event) => {
@@ -320,3 +380,5 @@ elements.list.addEventListener("click", (event) => {
 window.addEventListener("planner:state-loaded", render);
 window.addEventListener("storage", (event) => { if (event.key === STORAGE_KEY) render(); });
 render();
+
+

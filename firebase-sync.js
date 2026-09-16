@@ -1,4 +1,5 @@
 const STORAGE_KEY = "life-planner:v2";
+const QUESTION_BACKUP_KEY = "life-planner:question-bank-backups";
 const config = window.FIREBASE_CONFIG || {};
 const configured = config.apiKey && !config.apiKey.startsWith("YOUR_") && config.projectId && !config.projectId.startsWith("YOUR_");
 const elements = {
@@ -78,9 +79,27 @@ function getLocalState() {
   }
 }
 
+function backupQuestionData(state, reason = "before-cloud-load") {
+  if (!state?.questionBank) return;
+  try {
+    const backups = JSON.parse(localStorage.getItem(QUESTION_BACKUP_KEY)) || [];
+    backups.unshift({
+      backedUpAt: new Date().toISOString(),
+      reason,
+      questionBank: JSON.parse(JSON.stringify(state.questionBank)),
+      genesisCrystals: Number(state.genesisCrystals) || 0,
+      shopPurchases: Array.isArray(state.shopPurchases) ? JSON.parse(JSON.stringify(state.shopPurchases)) : []
+    });
+    localStorage.setItem(QUESTION_BACKUP_KEY, JSON.stringify(backups.slice(0, 10)));
+  } catch (error) {
+    console.warn("Question bank backup failed", error);
+  }
+}
+
 function writeLocalState(state) {
   const normalized = window.PlannerTasks?.normalize ? window.PlannerTasks.normalize(state) : state;
   if (!normalized) return false;
+  backupQuestionData(getLocalState(), "before-cloud-load");
   applyingCloudState = true;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
   lastSyncedState = JSON.stringify(normalized);
@@ -295,3 +314,5 @@ async function initializeFirebase() {
     console.error("Firebase initialization failed", error);
   }
 }
+
+
