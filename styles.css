@@ -768,3 +768,13 @@ footer {
 .question-search input:focus { border-color: var(--orange); box-shadow: 0 0 0 3px rgba(235,112,72,.14); }
 .question-keywords { display: flex; flex-wrap: wrap; gap: 6px; margin: -4px 0 12px; }
 .question-keywords span { display: inline-flex; align-items: center; min-height: 24px; padding: 0 9px; color: #7a5d18; background: rgba(216,188,110,.16); border: 1px solid rgba(182,154,77,.26); border-radius: 999px; font-size: 12px; font-weight: 900; }
+.playtime-bank { grid-column: 1 / -1; margin: -4px 0 0; color: #355e4b; font-size: 14px; font-weight: 900; }
+.playtime-bank strong { color: #7a5d18; font-variant-numeric: tabular-nums; }
+.playtime-withdraw { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; margin-top: 2px; }
+.playtime-withdraw label { display: grid; gap: 6px; color: var(--muted); font-size: 12px; font-weight: 900; letter-spacing: .06em; }
+.playtime-withdraw input { min-height: 42px; box-sizing: border-box; padding: 0 12px; color: var(--ink); background: rgba(255,255,255,.68); border: 1px solid var(--line); border-radius: 12px; font-weight: 900; outline: none; }
+.playtime-withdraw input:focus { border-color: var(--orange); box-shadow: 0 0 0 3px rgba(235,112,72,.12); }
+.playtime-withdraw button { min-height: 42px; padding: 0 16px; color: #fff; background: #355e4b; border: 1px solid #355e4b; border-radius: 12px; cursor: pointer; font-weight: 900; }
+.playtime-withdraw button:disabled, .playtime-withdraw input:disabled { opacity: .48; cursor: not-allowed; }
+.playtime-withdraw-status { grid-column: 1 / -1; min-height: 20px; margin: -6px 0 0; color: var(--muted); font-size: 12px; font-weight: 800; }
+@media (max-width: 520px) { .playtime-withdraw { grid-template-columns: 1fr; } }

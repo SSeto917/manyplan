@@ -79,7 +79,13 @@
       <div class="playtime-track" role="progressbar" aria-label="原神遊玩時間" aria-valuemin="0" aria-valuemax="60" aria-valuenow="0">
         <i id="genshinProgressBar"></i>
       </div>
-      <p class="playtime-note">完成 1 個任務 +5 分鐘，每天早上 5 點重置。</p>
+      <p class="playtime-bank">累積未用：<strong id="genshinBankedMinutes">0</strong> 分鐘</p>
+      <form class="playtime-withdraw" id="playtimeWithdrawForm">
+        <label><span>取出分鐘</span><input id="playtimeWithdrawAmount" type="number" inputmode="numeric" min="1" step="1" placeholder="例如 15"></label>
+        <button type="submit">取出</button>
+      </form>
+      <p class="playtime-withdraw-status" id="playtimeWithdrawStatus" role="status"></p>
+      <p class="playtime-note">完成 1 個任務 +5 分鐘，今日最多 60 分鐘；每天早上 5 點會把沒用掉的時長存進累積未用。</p>
     </section>
 
     <section class="task-section tab-view" id="timelineView" aria-labelledby="taskTitle">

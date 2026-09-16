@@ -28,11 +28,13 @@ window.PlannerTasks = (() => {
   }
   function normalizePlaytime(state, now) {
     if (!state.genshinPlaytime || typeof state.genshinPlaytime !== 'object') {
-      state.genshinPlaytime = { minutes: 0, resetKey: playtimeKey(now) };
+      state.genshinPlaytime = { minutes: 0, bankedMinutes: 0, resetKey: playtimeKey(now) };
       return;
     }
+    state.genshinPlaytime.bankedMinutes = Math.max(0, Number(state.genshinPlaytime.bankedMinutes) || 0);
     const key = playtimeKey(now);
     if (state.genshinPlaytime.resetKey !== key) {
+      state.genshinPlaytime.bankedMinutes += Math.max(0, Math.min(60, Number(state.genshinPlaytime.minutes) || 0));
       state.genshinPlaytime.minutes = 0;
       state.genshinPlaytime.resetKey = key;
       state.clientUpdatedAt = now.toISOString();
@@ -201,7 +203,9 @@ window.PlannerTasks = (() => {
     state.primogems = Math.max(0, state.primogems - refund);
     if (entry.playMinutes === 5) {
       normalizePlaytime(state, new Date());
-      state.genshinPlaytime.minutes = Math.max(0, state.genshinPlaytime.minutes - 5);
+      const fromToday = Math.min(5, state.genshinPlaytime.minutes);
+      state.genshinPlaytime.minutes = Math.max(0, state.genshinPlaytime.minutes - fromToday);
+      state.genshinPlaytime.bankedMinutes = Math.max(0, state.genshinPlaytime.bankedMinutes - (5 - fromToday));
     }
     return { ok: true, message: `已恢復至${project ? project.name : { daily: '今日', weekly: '本周', monthly: '本月', yearly: '今年' }[task.period] || '任務'}${refund ? '，並扣回 20 原石' : ''}。` };
   }

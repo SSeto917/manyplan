@@ -93,20 +93,45 @@ async function saveCurrentStateToCloud(label = "已同步・剛剛") {
   if (!currentUser || !db || !firebaseApi) return;
   const state = getLocalState();
   if (!state) return;
-  state.clientUpdatedAt ||= new Date().toISOString();
-  const serialized = JSON.stringify(state);
+  let serialized = JSON.stringify(state);
   if (serialized === lastSyncedState) return;
   const device = getDeviceInfo();
-  await firebaseApi.setDoc(cloudDocRef(), {
-    state,
-    schemaVersion: 2,
-    clientUpdatedAt: state.clientUpdatedAt,
-    savedFrom: device.type,
-    savedFromLabel: device.label,
-    updatedAt: firebaseApi.serverTimestamp()
-  }, { merge: true });
-  lastSyncedState = serialized;
-  setStatus(`${label}・${device.label}`);
+  let cloudWon = null;
+  let saved = false;
+  await firebaseApi.runTransaction(db, async (transaction) => {
+    const ref = cloudDocRef();
+    const snapshot = await transaction.get(ref);
+    const cloudData = snapshot.exists() ? snapshot.data() : null;
+    const cloudState = cloudData?.state || null;
+    const cloudTime = comparableTime(cloudData?.clientUpdatedAt || cloudState?.clientUpdatedAt);
+    const localTime = comparableTime(state.clientUpdatedAt);
+    if (cloudState && (cloudTime > localTime || (!localTime && JSON.stringify(cloudState) !== serialized))) {
+      cloudWon = { data: cloudData, state: cloudState };
+      return;
+    }
+    if (!localTime) {
+      state.clientUpdatedAt = new Date().toISOString();
+      serialized = JSON.stringify(state);
+    }
+    transaction.set(ref, {
+      state,
+      schemaVersion: 3,
+      clientUpdatedAt: state.clientUpdatedAt,
+      savedFrom: device.type,
+      savedFromLabel: device.label,
+      updatedAt: firebaseApi.serverTimestamp()
+    }, { merge: true });
+    saved = true;
+  });
+  if (cloudWon) {
+    writeLocalState(cloudWon.state);
+    setStatus(`已保留最新雲端・${cloudWon.data?.savedFromLabel || "未知裝置"}`);
+    return;
+  }
+  if (saved) {
+    lastSyncedState = serialized;
+    setStatus(`${label}・${device.label}`);
+  }
 }
 
 function scheduleCloudSave(event) {
@@ -134,9 +159,16 @@ async function loadCloudState() {
   if (snapshot.exists() && snapshot.data()?.state) {
     const data = snapshot.data();
     const localState = getLocalState();
-    if (comparableTime(localState?.clientUpdatedAt) > comparableTime(data.clientUpdatedAt || data.state?.clientUpdatedAt)) {
+    const localTime = comparableTime(localState?.clientUpdatedAt);
+    const cloudTime = comparableTime(data.clientUpdatedAt || data.state?.clientUpdatedAt);
+    if (localTime > cloudTime) {
       lastSyncedState = "";
       await saveCurrentStateToCloud("已同步本機變更");
+      return;
+    }
+    if (localTime === cloudTime && JSON.stringify(localState) === JSON.stringify(data.state)) {
+      lastSyncedState = JSON.stringify(data.state);
+      setStatus(describeCloudSave(data));
       return;
     }
     writeLocalState(data.state);

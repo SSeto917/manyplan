@@ -40,8 +40,12 @@ const elements = {
 };
 elements.viewDoneName = document.querySelector("#viewDoneName");
 elements.genshinMinutes = document.querySelector("#genshinMinutes");
+elements.genshinBankedMinutes = document.querySelector("#genshinBankedMinutes");
 elements.genshinProgressBar = document.querySelector("#genshinProgressBar");
 elements.playtimeTrack = document.querySelector(".playtime-track");
+elements.playtimeWithdrawForm = document.querySelector("#playtimeWithdrawForm");
+elements.playtimeWithdrawAmount = document.querySelector("#playtimeWithdrawAmount");
+elements.playtimeWithdrawStatus = document.querySelector("#playtimeWithdrawStatus");
 elements.currentTime = document.querySelector("#currentTime");
 elements.challengeModeToggle = document.querySelector("#challengeModeToggle");
 
@@ -334,10 +338,16 @@ function renderProgress() {
 
 function renderPlaytime() {
   const minutes = Math.max(0, Math.min(60, Number(state.genshinPlaytime?.minutes) || 0));
+  const bankedMinutes = Math.max(0, Number(state.genshinPlaytime?.bankedMinutes) || 0);
+  const withdrawLimit = Math.max(0, Math.min(bankedMinutes, 60 - minutes));
   const percent = Math.round(minutes / 60 * 100);
   elements.genshinMinutes.textContent = minutes;
+  elements.genshinBankedMinutes.textContent = bankedMinutes.toLocaleString("zh-TW");
   elements.genshinProgressBar.style.width = `${percent}%`;
   elements.playtimeTrack.setAttribute("aria-valuenow", String(minutes));
+  elements.playtimeWithdrawAmount.max = String(withdrawLimit);
+  elements.playtimeWithdrawAmount.disabled = withdrawLimit <= 0;
+  elements.playtimeWithdrawForm.querySelector("button").disabled = withdrawLimit <= 0;
 }
 
 function renderVisibility() {
@@ -493,6 +503,26 @@ elements.challengeModeToggle.addEventListener("click", () => {
   state.challenge ||= { enabled: false, penalties: {} };
   state.challenge.enabled = !state.challenge.enabled;
   if (!state.challenge.enabled) state.challenge.penalties ||= {};
+  saveState();
+  render();
+});
+
+elements.playtimeWithdrawForm.addEventListener("submit", (event) => {
+  event.preventDefault();
+  state.genshinPlaytime ||= { minutes: 0, bankedMinutes: 0, resetKey: getDateKey(new Date()) };
+  const minutes = Math.max(0, Math.min(60, Number(state.genshinPlaytime.minutes) || 0));
+  const bankedMinutes = Math.max(0, Number(state.genshinPlaytime.bankedMinutes) || 0);
+  const requested = Math.floor(Number(elements.playtimeWithdrawAmount.value) || 0);
+  const amount = Math.max(0, Math.min(requested, bankedMinutes, 60 - minutes));
+  if (amount <= 0) {
+    elements.playtimeWithdrawStatus.textContent = minutes >= 60 ? "今日可用時間已滿 60 分鐘。" : "請輸入可以取出的分鐘數。";
+    renderPlaytime();
+    return;
+  }
+  state.genshinPlaytime.minutes = minutes + amount;
+  state.genshinPlaytime.bankedMinutes = bankedMinutes - amount;
+  elements.playtimeWithdrawAmount.value = "";
+  elements.playtimeWithdrawStatus.textContent = `已取出 ${amount} 分鐘。`;
   saveState();
   render();
 });
