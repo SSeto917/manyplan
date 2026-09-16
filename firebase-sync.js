@@ -1,5 +1,6 @@
 const STORAGE_KEY = "life-planner:v2";
 const QUESTION_BACKUP_KEY = "life-planner:question-bank-backups";
+const QUESTION_CLOUD_BACKUP_KIND = "midnight-question-bank";
 const config = window.FIREBASE_CONFIG || {};
 const configured = config.apiKey && !config.apiKey.startsWith("YOUR_") && config.projectId && !config.projectId.startsWith("YOUR_");
 const elements = {
@@ -9,7 +10,10 @@ const elements = {
   title: document.querySelector("#loginTitle"), description: document.querySelector("#loginDescription"),
   message: document.querySelector("#loginMessage"), submit: document.querySelector("#loginSubmit"),
   status: document.querySelector("#cloudStatus"),
-  save: document.querySelector("#saveToCloud"), logout: document.querySelector("#logoutButton")
+  save: document.querySelector("#saveToCloud"), logout: document.querySelector("#logoutButton"),
+  questionBackupStatus: document.querySelector("#questionBackupStatus"),
+  questionBackupMeta: document.querySelector("#questionBackupMeta"),
+  questionBackupRestore: document.querySelector("#restoreQuestionCloudBackup")
 };
 
 let auth = null;
@@ -20,6 +24,7 @@ let unsubscribeSave = null;
 let saveTimer = null;
 let applyingCloudState = false;
 let lastSyncedState = "";
+let questionBackupTimer = null;
 
 function showMessage(message, success = false) {
   if (!elements.message) return;
@@ -65,9 +70,78 @@ function comparableTime(value) {
   const date = value ? new Date(value) : null;
   return date && Number.isFinite(date.getTime()) ? date.getTime() : 0;
 }
+function comparableRevision(value) {
+  const number = Number(value);
+  return Number.isSafeInteger(number) && number >= 0 ? number : 0;
+}
+
+function taipeiDateKey(date = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Taipei",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(date);
+}
+
+function formatBackupDateTime(value) {
+  const date = value?.toDate ? value.toDate() : value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) return "尚未備份";
+  return new Intl.DateTimeFormat("zh-TW", {
+    timeZone: "Asia/Taipei",
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(date);
+}
+
+function setQuestionBackupStatus(message) {
+  if (elements.questionBackupStatus) elements.questionBackupStatus.textContent = message;
+}
+
+function setQuestionBackupMeta(message) {
+  if (elements.questionBackupMeta) elements.questionBackupMeta.textContent = message;
+}
+
+function scheduleMidnightQuestionBackup() {
+  clearTimeout(questionBackupTimer);
+  if (!currentUser || !db || !firebaseApi) return;
+  const now = new Date();
+  const nextMidnight = new Date(now);
+  nextMidnight.setHours(24, 0, 5, 0);
+  questionBackupTimer = setTimeout(async () => {
+    try {
+      await ensureDailyQuestionCloudBackup();
+    } catch (error) {
+      setQuestionBackupStatus("午夜題庫備份失敗，下一次同步會再嘗試。");
+      console.error("Scheduled question cloud backup failed", error);
+    } finally {
+      scheduleMidnightQuestionBackup();
+    }
+  }, Math.max(1000, nextMidnight.getTime() - now.getTime()));
+}
+
+function getQuestionBackupPayload(state) {
+  if (!state?.questionBank) return null;
+  return {
+    questionBank: JSON.parse(JSON.stringify(state.questionBank)),
+    genesisCrystals: Number(state.genesisCrystals) || 0,
+    shopPurchases: Array.isArray(state.shopPurchases) ? JSON.parse(JSON.stringify(state.shopPurchases)) : []
+  };
+}
+
 
 function cloudDocRef() {
   return firebaseApi.doc(db, "users", currentUser.uid, "saves", "current");
+}
+
+function questionBackupDocRef(dateKey) {
+  return firebaseApi.doc(db, "users", currentUser.uid, "questionBackups", dateKey);
+}
+
+function questionBackupCollectionRef() {
+  return firebaseApi.collection(db, "users", currentUser.uid, "questionBackups");
 }
 
 function getLocalState() {
@@ -108,6 +182,100 @@ function writeLocalState(state) {
   return true;
 }
 
+async function getLatestQuestionCloudBackup() {
+  if (!currentUser || !db || !firebaseApi) return null;
+  const queryRef = firebaseApi.query(
+    questionBackupCollectionRef(),
+    firebaseApi.orderBy("backupDate", "desc"),
+    firebaseApi.limit(1)
+  );
+  const snapshot = await firebaseApi.getDocs(queryRef);
+  if (snapshot.empty) return null;
+  const doc = snapshot.docs[0];
+  return { id: doc.id, data: doc.data() };
+}
+
+async function updateQuestionCloudBackupPanel() {
+  if (!elements.questionBackupRestore && !elements.questionBackupMeta) return;
+  if (!currentUser || !db || !firebaseApi) {
+    if (elements.questionBackupRestore) elements.questionBackupRestore.disabled = true;
+    setQuestionBackupMeta("登入後會每天 00:00 保留一份題庫雲端備份。");
+    return;
+  }
+  try {
+    const latest = await getLatestQuestionCloudBackup();
+    if (!latest?.data?.payload?.questionBank) {
+      if (elements.questionBackupRestore) elements.questionBackupRestore.disabled = true;
+      setQuestionBackupMeta("尚未建立題庫雲端備份。");
+      return;
+    }
+    if (elements.questionBackupRestore) elements.questionBackupRestore.disabled = false;
+    const count = latest.data.payload.questionBank.questions?.length || 0;
+    setQuestionBackupMeta(`最近備份：${latest.id}・${formatBackupDateTime(latest.data.createdAt)}・${count} 題`);
+  } catch (error) {
+    if (elements.questionBackupRestore) elements.questionBackupRestore.disabled = true;
+    setQuestionBackupMeta("讀取題庫備份失敗。");
+    console.error("Question cloud backup status failed", error);
+  }
+}
+
+async function ensureDailyQuestionCloudBackup() {
+  if (!currentUser || !db || !firebaseApi) return;
+  try {
+    const state = getLocalState();
+    const payload = getQuestionBackupPayload(state);
+    if (!payload) return;
+    const dateKey = taipeiDateKey();
+    const device = getDeviceInfo();
+    let created = false;
+    await firebaseApi.runTransaction(db, async (transaction) => {
+      const ref = questionBackupDocRef(dateKey);
+      const snapshot = await transaction.get(ref);
+      if (snapshot.exists()) return;
+      transaction.set(ref, {
+        kind: QUESTION_CLOUD_BACKUP_KIND,
+        backupDate: dateKey,
+        payload,
+        questionCount: payload.questionBank.questions?.length || 0,
+        savedFrom: device.type,
+        savedFromLabel: device.label,
+        clientUpdatedAt: state.clientUpdatedAt || null,
+        sourceCloudRevision: comparableRevision(state.cloudRevision),
+        createdAt: firebaseApi.serverTimestamp()
+      });
+      created = true;
+    });
+    if (created) setQuestionBackupStatus(`已建立 ${dateKey} 題庫雲端備份。`);
+    await updateQuestionCloudBackupPanel();
+  } catch (error) {
+    setQuestionBackupStatus("題庫雲端備份失敗，主存檔同步不受影響。");
+    console.error("Question cloud backup failed", error);
+  }
+}
+
+async function restoreLatestQuestionCloudBackup() {
+  if (!currentUser || !db || !firebaseApi) return;
+  const latest = await getLatestQuestionCloudBackup();
+  const payload = latest?.data?.payload;
+  if (!payload?.questionBank) {
+    setQuestionBackupStatus("目前沒有可回復的題庫備份。");
+    return;
+  }
+  const state = getLocalState() || {};
+  backupQuestionData(state, "before-restore-cloud-question-backup");
+  state.questionBank = JSON.parse(JSON.stringify(payload.questionBank));
+  state.genesisCrystals = Number(payload.genesisCrystals) || 0;
+  state.shopPurchases = Array.isArray(payload.shopPurchases) ? JSON.parse(JSON.stringify(payload.shopPurchases)) : [];
+  state.clientUpdatedAt = new Date().toISOString();
+  applyingCloudState = true;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  applyingCloudState = false;
+  lastSyncedState = "";
+  window.dispatchEvent(new CustomEvent("planner:state-loaded"));
+  await saveCurrentStateToCloud(`已回復題庫備份 ${latest.id}`);
+  setQuestionBackupStatus(`已用 ${latest.id} 的題庫備份覆蓋目前題庫。`);
+  await updateQuestionCloudBackupPanel();
+}
 async function saveCurrentStateToCloud(label = "已同步・剛剛") {
   if (!currentUser || !db || !firebaseApi) return;
   const state = getLocalState();
@@ -124,17 +292,24 @@ async function saveCurrentStateToCloud(label = "已同步・剛剛") {
     const cloudState = cloudData?.state || null;
     const cloudTime = comparableTime(cloudData?.clientUpdatedAt || cloudState?.clientUpdatedAt);
     const localTime = comparableTime(state.clientUpdatedAt);
-    if (cloudState && (cloudTime > localTime || (!localTime && JSON.stringify(cloudState) !== serialized))) {
+    const cloudRevision = comparableRevision(cloudData?.revision || cloudState?.cloudRevision);
+    const localRevision = comparableRevision(state.cloudRevision);
+    const cloudLooksNewer = cloudState && (
+      cloudRevision > localRevision ||
+      (cloudRevision === localRevision && (cloudTime > localTime || (!localTime && JSON.stringify(cloudState) !== serialized)))
+    );
+    if (cloudLooksNewer) {
       cloudWon = { data: cloudData, state: cloudState };
       return;
     }
-    if (!localTime) {
-      state.clientUpdatedAt = new Date().toISOString();
-      serialized = JSON.stringify(state);
-    }
+    if (!localTime) state.clientUpdatedAt = new Date().toISOString();
+    const nextRevision = Math.max(cloudRevision, localRevision) + 1;
+    state.cloudRevision = nextRevision;
+    serialized = JSON.stringify(state);
     transaction.set(ref, {
       state,
-      schemaVersion: 3,
+      schemaVersion: 4,
+      revision: nextRevision,
       clientUpdatedAt: state.clientUpdatedAt,
       savedFrom: device.type,
       savedFromLabel: device.label,
@@ -180,21 +355,27 @@ async function loadCloudState() {
     const localState = getLocalState();
     const localTime = comparableTime(localState?.clientUpdatedAt);
     const cloudTime = comparableTime(data.clientUpdatedAt || data.state?.clientUpdatedAt);
-    if (localTime > cloudTime) {
+    const localRevision = comparableRevision(localState?.cloudRevision);
+    const cloudRevision = comparableRevision(data.revision || data.state?.cloudRevision);
+    if (localRevision > cloudRevision || (!localRevision && !cloudRevision && localTime > cloudTime)) {
       lastSyncedState = "";
       await saveCurrentStateToCloud("已同步本機變更");
+      await ensureDailyQuestionCloudBackup();
       return;
     }
-    if (localTime === cloudTime && JSON.stringify(localState) === JSON.stringify(data.state)) {
+    if (localRevision === cloudRevision && localTime === cloudTime && JSON.stringify(localState) === JSON.stringify(data.state)) {
       lastSyncedState = JSON.stringify(data.state);
       setStatus(describeCloudSave(data));
+      await ensureDailyQuestionCloudBackup();
       return;
     }
     writeLocalState(data.state);
     setStatus(describeCloudSave(data));
+    await ensureDailyQuestionCloudBackup();
     return;
   }
   await saveCurrentStateToCloud("已建立雲端存檔");
+  await ensureDailyQuestionCloudBackup();
 }
 
 function friendlyError(error) {
@@ -258,6 +439,22 @@ if (elements.save) {
 
 if (elements.logout) elements.logout.addEventListener("click", () => { if (auth && firebaseApi) firebaseApi.signOut(auth); });
 
+if (elements.questionBackupRestore) {
+  elements.questionBackupRestore.addEventListener("click", async () => {
+    if (!currentUser || !db || !firebaseApi) return;
+    elements.questionBackupRestore.disabled = true;
+    setQuestionBackupStatus("正在回復題庫備份…");
+    try {
+      await restoreLatestQuestionCloudBackup();
+    } catch (error) {
+      setQuestionBackupStatus("回復題庫備份失敗。");
+      console.error("Question cloud backup restore failed", error);
+    } finally {
+      await updateQuestionCloudBackupPanel();
+    }
+  });
+}
+
 if (!configured) {
   setStatus("Firebase 尚未設定");
   if (elements.title) elements.title.textContent = "尚未連接 Firebase";
@@ -290,16 +487,20 @@ async function initializeFirebase() {
       if (elements.logout) elements.logout.hidden = !user;
       setStatus(user ? user.email : "尚未登入");
       clearTimeout(saveTimer);
+      clearTimeout(questionBackupTimer);
       window.removeEventListener("planner:state-saved", scheduleCloudSave);
       if (!user) {
         unsubscribeSave = null;
         lastSyncedState = "";
+        await updateQuestionCloudBackupPanel();
         return;
       }
       window.addEventListener("planner:state-saved", scheduleCloudSave);
       unsubscribeSave = scheduleCloudSave;
       try {
         await loadCloudState();
+        await updateQuestionCloudBackupPanel();
+        scheduleMidnightQuestionBackup();
       } catch (error) {
         setStatus("同步失敗");
         console.error("Firebase load failed", error);
@@ -314,5 +515,14 @@ async function initializeFirebase() {
     console.error("Firebase initialization failed", error);
   }
 }
+
+
+
+
+
+
+
+
+
 
 

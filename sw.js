@@ -1,4 +1,4 @@
-const CACHE_NAME = "task-planner-v46-question-safe-save";
+const CACHE_NAME = "task-planner-v49-question-save-rules";
 const APP_SHELL = [
   "./fonts/HYWenHei-Extended.ttf",
   "./",
@@ -47,4 +47,7 @@ self.addEventListener("fetch", (event) => {
     })
   );
 });
+
+
+
 

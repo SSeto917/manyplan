@@ -42,6 +42,16 @@
       <p class="restore-status" id="genesisShopStatus" role="status"></p>
     </section>
 
+
+    <section class="question-cloud-backup" aria-labelledby="questionBackupTitle">
+      <div class="section-heading">
+        <div><p class="section-label">CLOUD BACKUP</p><h2 id="questionBackupTitle">午夜題庫備份</h2></div>
+        <button class="primary-button" id="restoreQuestionCloudBackup" type="button" disabled>回復備份</button>
+      </div>
+      <p class="question-backup-note">每天 00:00 後會自動在 Firebase 保留當天第一份題庫備份。若隔天資料被覆蓋，按「回復備份」會直接用最近的午夜備份覆蓋目前題庫、創世結晶與商店紀錄。</p>
+      <p class="question-backup-meta" id="questionBackupMeta">登入後會讀取最近備份。</p>
+      <p class="restore-status" id="questionBackupStatus" role="status"></p>
+    </section>
     <nav class="question-subject-tabs" id="subjectTabs" aria-label="科目分類"></nav>
 
     <section class="question-editor" aria-labelledby="questionEditorTitle">
@@ -86,3 +96,5 @@
   <script type="module" src="firebase-sync.js"></script>
 </body>
 </html>
+
+

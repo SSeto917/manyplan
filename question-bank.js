@@ -308,10 +308,19 @@ elements.genesisProducts.addEventListener("click", (event) => {
     render();
     return;
   }
-  state.genesisCrystals -= product.cost;
-  state.shopPurchases.push({ id: createId("purchase"), productId: product.id, label: product.label, cost: product.cost, purchasedAt: new Date().toISOString() });
+  const beforeCrystals = Number(state.genesisCrystals) || 0;
+  state.genesisCrystals = Math.max(0, beforeCrystals - product.cost);
+  state.shopPurchases.push({
+    id: createId("purchase"),
+    productId: product.id,
+    label: product.label,
+    cost: product.cost,
+    beforeCrystals,
+    afterCrystals: state.genesisCrystals,
+    purchasedAt: new Date().toISOString()
+  });
   saveState(state);
-  elements.genesisStatus.textContent = `已兌換 ${product.label}。`;
+  elements.genesisStatus.textContent = `已兌換 ${product.label}，扣除 ${product.cost.toLocaleString("zh-TW")} 創世結晶，剩餘 ${state.genesisCrystals.toLocaleString("zh-TW")}。`;
   render();
 });
 elements.tabs.addEventListener("click", (event) => {
@@ -380,5 +389,6 @@ elements.list.addEventListener("click", (event) => {
 window.addEventListener("planner:state-loaded", render);
 window.addEventListener("storage", (event) => { if (event.key === STORAGE_KEY) render(); });
 render();
+
 
 
