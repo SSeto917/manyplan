@@ -122,8 +122,11 @@ window.PlannerTasks = (() => {
     if (!state.challenge || typeof state.challenge !== 'object') state.challenge = { enabled: false, penalties: {} };
     state.challenge.enabled = Boolean(state.challenge.enabled);
     if (!state.challenge.penalties || typeof state.challenge.penalties !== 'object' || Array.isArray(state.challenge.penalties)) state.challenge.penalties = {};
-    state.genesisCrystals = Number.isSafeInteger(state.genesisCrystals) && state.genesisCrystals >= 0 ? state.genesisCrystals : 0;
-    if (!Array.isArray(state.shopPurchases)) state.shopPurchases = [];
+    const legacyCrystals = Number.isSafeInteger(state.genesisCrystals) && state.genesisCrystals >= 0 ? state.genesisCrystals : 0;
+    state.gameFundBalance = Number.isSafeInteger(state.gameFundBalance) && state.gameFundBalance >= 0 ? state.gameFundBalance : legacyCrystals;
+    if (!Array.isArray(state.gameFundWithdrawals)) state.gameFundWithdrawals = Array.isArray(state.shopPurchases) ? state.shopPurchases.map(purchase => ({ ...purchase, migratedFromGenesisShop: true })) : [];
+    state.genesisCrystals = state.gameFundBalance;
+    state.shopPurchases = state.gameFundWithdrawals;
     state.primogems = Number.isSafeInteger(state.primogems) && state.primogems >= 0 ? state.primogems : 0;
     normalizePlaytime(state, now);
     function migrate(list, project) {

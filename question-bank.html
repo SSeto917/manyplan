@@ -32,26 +32,21 @@
       <div class="history-total"><strong id="questionCount">0</strong><span>題</span></div>
     </header>
 
-    <section class="genesis-shop" aria-labelledby="genesisShopTitle">
-      <div class="genesis-wallet">
-        <div><p class="section-label">GENESIS CRYSTAL</p><h2 id="genesisShopTitle">創世結晶商店</h2></div>
-        <strong><span id="genesisCrystalCount">0</span><small>創世結晶</small></strong>
+    <div class="question-utility-row">
+      <form class="game-fund-panel" id="gameFundWithdrawForm" aria-label="遊戲基金">
+        <span class="utility-label">遊戲基金</span>
+        <strong><span id="gameFundBalance">0</span></strong>
+        <label><span>提取</span><input id="gameFundWithdrawAmount" type="number" inputmode="numeric" min="1" step="1" placeholder="金額"></label>
+        <button class="text-button" type="submit">提取</button>
+        <span class="restore-status" id="gameFundStatus" role="status"></span>
+      </form>
+      <div class="question-cloud-backup" aria-label="午夜題庫備份">
+        <span class="question-backup-title">備份</span>
+        <span class="question-backup-meta" id="questionBackupMeta">登入後讀取最近備份。</span>
+        <button class="text-button" id="restoreQuestionCloudBackup" type="button" disabled>回復</button>
+        <span class="restore-status" id="questionBackupStatus" role="status"></span>
       </div>
-      <p class="genesis-shop-note">題庫每新增 1 題 +1 創世結晶，可在這裡兌換商品。</p>
-      <div class="genesis-products" id="genesisProducts"></div>
-      <p class="restore-status" id="genesisShopStatus" role="status"></p>
-    </section>
-
-
-    <section class="question-cloud-backup" aria-labelledby="questionBackupTitle">
-      <div class="section-heading">
-        <div><p class="section-label">CLOUD BACKUP</p><h2 id="questionBackupTitle">午夜題庫備份</h2></div>
-        <button class="primary-button" id="restoreQuestionCloudBackup" type="button" disabled>回復備份</button>
-      </div>
-      <p class="question-backup-note">每天 00:00 後會自動在 Firebase 保留當天第一份題庫備份。若隔天資料被覆蓋，按「回復備份」會直接用最近的午夜備份覆蓋目前題庫、創世結晶與商店紀錄。</p>
-      <p class="question-backup-meta" id="questionBackupMeta">登入後會讀取最近備份。</p>
-      <p class="restore-status" id="questionBackupStatus" role="status"></p>
-    </section>
+    </div>
     <nav class="question-subject-tabs" id="subjectTabs" aria-label="科目分類"></nav>
 
     <section class="question-editor" aria-labelledby="questionEditorTitle">
@@ -73,7 +68,7 @@
 
     <section class="history-content question-list-section" aria-labelledby="questionListTitle">
       <div class="section-heading">
-        <div><p class="section-label" id="questionListLabel">ALL SUBJECTS</p><h2 id="questionListTitle">全部題目</h2></div>
+        <div><p class="section-label" id="questionListLabel">REVIEW</p><h2 id="questionListTitle">複習題目</h2></div>
       </div>
       <label class="question-search"><span>搜尋關鍵字</span><input id="questionSearch" type="search" placeholder="輸入關鍵字、題目文字或詳解"></label>
       <div class="practice-toolbar" id="practiceToolbar" hidden>
@@ -88,7 +83,7 @@
       </div>
     </section>
 
-    <footer><p class="footer-note">科目越多，越適合用上方標籤快速切換。</p></footer>
+    
   </main>
   <script src="task-state.js"></script>
   <script src="question-bank.js"></script>

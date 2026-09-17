@@ -139,12 +139,17 @@
 [data-theme="dark"] .playtime-withdraw input { background: #18241e; color: #f1f6ed; border-color: #526a5a; }
 [data-theme="dark"] .playtime-withdraw button { background: #376b51; border-color: #739582; color: #fff; }
 [data-theme="dark"] .playtime-withdraw-status { color: #a9b9ae; }
-[data-theme="dark"] .genesis-shop { background: #1e2b24; border-color: var(--line); box-shadow: inset 0 0 0 4px rgba(189,169,102,.08); }
-[data-theme="dark"] .genesis-wallet strong { color: #ddc38c; }
-[data-theme="dark"] .genesis-product { color: #f1f6ed; background: #18241e; border-color: #526a5a; }
-[data-theme="dark"] .genesis-product small { color: #ddc38c; }
-[data-theme="dark"] .genesis-product:hover:not(:disabled) { border-color: #bda966; }
+[data-theme="dark"] .game-fund-withdraw button { background: #376b51; border-color: #739582; color: #fff; }
 
-[data-theme="dark"] .question-cloud-backup { background: #1e2b24; border-color: var(--line); box-shadow: inset 0 0 0 4px rgba(189,169,102,.08); }
-[data-theme="dark"] .question-backup-note { color: #a9b9ae; }
-[data-theme="dark"] .question-backup-meta { color: #d7f4df; }
+
+[data-theme="dark"] .game-fund-withdraw input { background: #18241e; color: #f1f6ed; border-color: #526a5a; }
+
+[data-theme="dark"] .question-backup-title { color: #ddc38c; }
+[data-theme="dark"] .question-backup-meta { color: #a9b9ae; }
+
+[data-theme="dark"] .game-fund-panel,
+[data-theme="dark"] .question-cloud-backup { background: #1b2922; border-color: #526a5a; }
+[data-theme="dark"] .utility-label,
+[data-theme="dark"] .question-backup-title,
+[data-theme="dark"] .game-fund-panel strong { color: #ddc38c; }
+[data-theme="dark"] .game-fund-panel input { background: #18241e; color: #f1f6ed; border-color: #526a5a; }

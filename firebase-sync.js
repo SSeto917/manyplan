@@ -126,11 +126,12 @@ function getQuestionBackupPayload(state) {
   if (!state?.questionBank) return null;
   return {
     questionBank: JSON.parse(JSON.stringify(state.questionBank)),
-    genesisCrystals: Number(state.genesisCrystals) || 0,
-    shopPurchases: Array.isArray(state.shopPurchases) ? JSON.parse(JSON.stringify(state.shopPurchases)) : []
+    gameFundBalance: Number(state.gameFundBalance ?? state.genesisCrystals) || 0,
+    gameFundWithdrawals: Array.isArray(state.gameFundWithdrawals) ? JSON.parse(JSON.stringify(state.gameFundWithdrawals)) : [],
+    genesisCrystals: Number(state.gameFundBalance ?? state.genesisCrystals) || 0,
+    shopPurchases: Array.isArray(state.gameFundWithdrawals) ? JSON.parse(JSON.stringify(state.gameFundWithdrawals)) : []
   };
 }
-
 
 function cloudDocRef() {
   return firebaseApi.doc(db, "users", currentUser.uid, "saves", "current");
@@ -161,8 +162,10 @@ function backupQuestionData(state, reason = "before-cloud-load") {
       backedUpAt: new Date().toISOString(),
       reason,
       questionBank: JSON.parse(JSON.stringify(state.questionBank)),
-      genesisCrystals: Number(state.genesisCrystals) || 0,
-      shopPurchases: Array.isArray(state.shopPurchases) ? JSON.parse(JSON.stringify(state.shopPurchases)) : []
+      gameFundBalance: Number(state.gameFundBalance ?? state.genesisCrystals) || 0,
+      gameFundWithdrawals: Array.isArray(state.gameFundWithdrawals) ? JSON.parse(JSON.stringify(state.gameFundWithdrawals)) : [],
+      genesisCrystals: Number(state.gameFundBalance ?? state.genesisCrystals) || 0,
+      shopPurchases: Array.isArray(state.gameFundWithdrawals) ? JSON.parse(JSON.stringify(state.gameFundWithdrawals)) : []
     });
     localStorage.setItem(QUESTION_BACKUP_KEY, JSON.stringify(backups.slice(0, 10)));
   } catch (error) {
@@ -264,8 +267,12 @@ async function restoreLatestQuestionCloudBackup() {
   const state = getLocalState() || {};
   backupQuestionData(state, "before-restore-cloud-question-backup");
   state.questionBank = JSON.parse(JSON.stringify(payload.questionBank));
-  state.genesisCrystals = Number(payload.genesisCrystals) || 0;
-  state.shopPurchases = Array.isArray(payload.shopPurchases) ? JSON.parse(JSON.stringify(payload.shopPurchases)) : [];
+  state.gameFundBalance = Number(payload.gameFundBalance ?? payload.genesisCrystals) || 0;
+  state.gameFundWithdrawals = Array.isArray(payload.gameFundWithdrawals)
+    ? JSON.parse(JSON.stringify(payload.gameFundWithdrawals))
+    : Array.isArray(payload.shopPurchases) ? JSON.parse(JSON.stringify(payload.shopPurchases)) : [];
+  state.genesisCrystals = state.gameFundBalance;
+  state.shopPurchases = state.gameFundWithdrawals;
   state.clientUpdatedAt = new Date().toISOString();
   applyingCloudState = true;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));

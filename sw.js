@@ -1,4 +1,4 @@
-const CACHE_NAME = "task-planner-v49-question-save-rules";
+const CACHE_NAME = "task-planner-v52-focused-question-bank";
 const APP_SHELL = [
   "./fonts/HYWenHei-Extended.ttf",
   "./",

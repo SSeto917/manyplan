@@ -3,7 +3,8 @@ const QUESTION_BACKUP_KEY = "life-planner:question-bank-backups";
 
 const elements = {
   count: document.querySelector("#questionCount"), tabs: document.querySelector("#subjectTabs"),
-  genesisCount: document.querySelector("#genesisCrystalCount"), genesisProducts: document.querySelector("#genesisProducts"), genesisStatus: document.querySelector("#genesisShopStatus"),
+  gameFundBalance: document.querySelector("#gameFundBalance"), gameFundForm: document.querySelector("#gameFundWithdrawForm"),
+  gameFundAmount: document.querySelector("#gameFundWithdrawAmount"), gameFundStatus: document.querySelector("#gameFundStatus"),
   form: document.querySelector("#questionForm"), subjectSelect: document.querySelector("#questionSubjectSelect"),
   newSubjectField: document.querySelector("#newSubjectField"), subject: document.querySelector("#questionSubject"),
   answer: document.querySelector("#questionAnswer"), keywords: document.querySelector("#questionKeywords"),
@@ -15,14 +16,6 @@ const elements = {
   search: document.querySelector("#questionSearch")
 };
 
-const genesisProducts = [
-  { id: "genesis-60", label: "60 創世結晶", cost: 60 },
-  { id: "genesis-330", label: "300 + 30 創世結晶", cost: 330 },
-  { id: "genesis-1090", label: "1090 創世結晶", cost: 1090 },
-  { id: "genesis-2240", label: "1980 + 260 創世結晶", cost: 2240 },
-  { id: "genesis-3880", label: "3280 + 600 創世結晶", cost: 3880 },
-  { id: "genesis-8080", label: "8080 創世結晶", cost: 8080 }
-];
 
 let activeSubject = "all";
 let activeIndex = 0;
@@ -47,8 +40,11 @@ function loadState() {
 }
 
 function ensureQuestionBank(state) {
-  state.genesisCrystals = Number.isSafeInteger(state.genesisCrystals) && state.genesisCrystals >= 0 ? state.genesisCrystals : 0;
-  if (!Array.isArray(state.shopPurchases)) state.shopPurchases = [];
+  const legacyCrystals = Number.isSafeInteger(state.genesisCrystals) && state.genesisCrystals >= 0 ? state.genesisCrystals : 0;
+  state.gameFundBalance = Number.isSafeInteger(state.gameFundBalance) && state.gameFundBalance >= 0 ? state.gameFundBalance : legacyCrystals;
+  if (!Array.isArray(state.gameFundWithdrawals)) state.gameFundWithdrawals = Array.isArray(state.shopPurchases) ? state.shopPurchases.map((purchase) => ({ ...purchase, migratedFromGenesisShop: true })) : [];
+  state.genesisCrystals = state.gameFundBalance;
+  state.shopPurchases = state.gameFundWithdrawals;
   state.questionBank ||= { subjects: [], questions: [] };
   if (!Array.isArray(state.questionBank.subjects)) state.questionBank.subjects = [];
   if (!Array.isArray(state.questionBank.questions)) state.questionBank.questions = [];
@@ -69,8 +65,10 @@ function backupQuestionData(state, reason = "question-save") {
       backedUpAt: new Date().toISOString(),
       reason,
       questionBank: JSON.parse(JSON.stringify(bank)),
-      genesisCrystals: Number(state.genesisCrystals) || 0,
-      shopPurchases: Array.isArray(state.shopPurchases) ? JSON.parse(JSON.stringify(state.shopPurchases)) : []
+      gameFundBalance: Number(state.gameFundBalance) || 0,
+      gameFundWithdrawals: Array.isArray(state.gameFundWithdrawals) ? JSON.parse(JSON.stringify(state.gameFundWithdrawals)) : [],
+      genesisCrystals: Number(state.gameFundBalance ?? state.genesisCrystals) || 0,
+      shopPurchases: Array.isArray(state.gameFundWithdrawals) ? JSON.parse(JSON.stringify(state.gameFundWithdrawals)) : []
     });
     localStorage.setItem(QUESTION_BACKUP_KEY, JSON.stringify(backups.slice(0, 10)));
   } catch (error) {
@@ -218,13 +216,7 @@ function render() {
   const state = loadState();
   if (!state) return;
   const bank = ensureQuestionBank(state);
-  elements.genesisCount.textContent = state.genesisCrystals.toLocaleString("zh-TW");
-  elements.genesisProducts.innerHTML = genesisProducts.map((product) => `
-    <button class="genesis-product" type="button" data-product-id="${escapeHTML(product.id)}" ${state.genesisCrystals < product.cost ? "disabled" : ""}>
-      <span>${escapeHTML(product.label)}</span>
-      <small>兌換需要 ${product.cost.toLocaleString("zh-TW")} 顆</small>
-    </button>
-  `).join("");
+  elements.gameFundBalance.textContent = state.gameFundBalance.toLocaleString("zh-TW");
   const subjects = groupedSubjects(bank);
   if (activeSubject !== "all" && !subjects.includes(activeSubject)) activeSubject = "all";
   renderSubjectSelect(subjects);
@@ -285,42 +277,46 @@ elements.form.addEventListener("submit", (event) => {
   const keywords = normalizeKeywords(elements.keywords.value);
   if (!bank.subjects.includes(subject)) bank.subjects.push(subject);
   bank.questions.unshift({ id: createId(), subject, stem: parsed.stem, options: parsed.options, answer, explanation, keywords, answerCount: 0, createdAt: new Date().toISOString() });
-  state.genesisCrystals = (Number(state.genesisCrystals) || 0) + 1;
+  state.gameFundBalance = (Number(state.gameFundBalance) || 0) + 1;
+  state.genesisCrystals = state.gameFundBalance;
   activeSubject = subject;
   saveState(state);
   elements.form.reset();
   elements.preview.hidden = true;
   elements.preview.innerHTML = "";
-  elements.status.textContent = "已加入題庫，獲得 1 創世結晶。";
+  elements.status.textContent = "已加入題庫，遊戲基金 +1。";
   render();
 });
 
-elements.genesisProducts.addEventListener("click", (event) => {
-  const button = event.target.closest("button[data-product-id]");
-  if (!button) return;
-  const product = genesisProducts.find((item) => item.id === button.dataset.productId);
-  if (!product) return;
+elements.gameFundForm.addEventListener("submit", (event) => {
+  event.preventDefault();
   const state = loadState();
   if (!state) return;
   ensureQuestionBank(state);
-  if (state.genesisCrystals < product.cost) {
-    elements.genesisStatus.textContent = "創世結晶不足。";
+  const amount = Math.floor(Number(elements.gameFundAmount.value));
+  if (!Number.isSafeInteger(amount) || amount <= 0) {
+    elements.gameFundStatus.textContent = "請輸入要提取的正整數金額。";
+    return;
+  }
+  if (amount > state.gameFundBalance) {
+    elements.gameFundStatus.textContent = "遊戲基金餘額不足。";
     render();
     return;
   }
-  const beforeCrystals = Number(state.genesisCrystals) || 0;
-  state.genesisCrystals = Math.max(0, beforeCrystals - product.cost);
-  state.shopPurchases.push({
-    id: createId("purchase"),
-    productId: product.id,
-    label: product.label,
-    cost: product.cost,
-    beforeCrystals,
-    afterCrystals: state.genesisCrystals,
-    purchasedAt: new Date().toISOString()
+  const beforeBalance = Number(state.gameFundBalance) || 0;
+  state.gameFundBalance = Math.max(0, beforeBalance - amount);
+  state.genesisCrystals = state.gameFundBalance;
+  state.gameFundWithdrawals.push({
+    id: createId("fund-withdrawal"),
+    amount,
+    beforeBalance,
+    afterBalance: state.gameFundBalance,
+    withdrawnAt: new Date().toISOString()
   });
+  state.shopPurchases = state.gameFundWithdrawals;
   saveState(state);
-  elements.genesisStatus.textContent = `已兌換 ${product.label}，扣除 ${product.cost.toLocaleString("zh-TW")} 創世結晶，剩餘 ${state.genesisCrystals.toLocaleString("zh-TW")}。`;
+  elements.gameFundStatus.textContent = `已提取 ${amount.toLocaleString("zh-TW")}，剩餘 ${state.gameFundBalance.toLocaleString("zh-TW")}。`;
+  elements.gameFundAmount.value = "";
   render();
 });
 elements.tabs.addEventListener("click", (event) => {
