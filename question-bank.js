@@ -36,7 +36,7 @@ function loadState() {
     if (normalized) return normalized;
   } catch {
   }
-  return { activePeriod: "daily", history: [], incomplete: [], primogems: 0, tasks: [], projects: [], questionBank: { subjects: [], questions: [] } };
+  return window.PlannerTasks?.createDefaultState ? window.PlannerTasks.createDefaultState() : { activePeriod: "daily", history: [], incomplete: [], primogems: 0, tasks: [], projects: [], questionBank: { subjects: [], questions: [] } };
 }
 
 function ensureQuestionBank(state) {

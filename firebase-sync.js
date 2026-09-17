@@ -13,7 +13,9 @@ const elements = {
   save: document.querySelector("#saveToCloud"), logout: document.querySelector("#logoutButton"),
   questionBackupStatus: document.querySelector("#questionBackupStatus"),
   questionBackupMeta: document.querySelector("#questionBackupMeta"),
-  questionBackupRestore: document.querySelector("#restoreQuestionCloudBackup")
+  questionBackupRestore: document.querySelector("#restoreQuestionCloudBackup"),
+  questionCloudUpload: document.querySelector("#uploadQuestionCloud"),
+  questionCloudLoad: document.querySelector("#loadQuestionCloud")
 };
 
 let auth = null;
@@ -25,6 +27,8 @@ let saveTimer = null;
 let applyingCloudState = false;
 let lastSyncedState = "";
 let questionBackupTimer = null;
+let questionBankDirty = false;
+const isQuestionBankPage = Boolean(document.querySelector(".question-bank-page"));
 
 function showMessage(message, success = false) {
   if (!elements.message) return;
@@ -75,6 +79,10 @@ function comparableRevision(value) {
   return Number.isSafeInteger(number) && number >= 0 ? number : 0;
 }
 
+function questionCountOf(state) {
+  return Array.isArray(state?.questionBank?.questions) ? state.questionBank.questions.length : 0;
+}
+
 function taipeiDateKey(date = new Date()) {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Taipei",
@@ -102,6 +110,11 @@ function setQuestionBackupStatus(message) {
 
 function setQuestionBackupMeta(message) {
   if (elements.questionBackupMeta) elements.questionBackupMeta.textContent = message;
+}
+
+function setQuestionManualButtonsEnabled(enabled) {
+  if (elements.questionCloudUpload) elements.questionCloudUpload.disabled = !enabled;
+  if (elements.questionCloudLoad) elements.questionCloudLoad.disabled = !enabled;
 }
 
 function scheduleMidnightQuestionBackup() {
@@ -301,7 +314,11 @@ async function saveCurrentStateToCloud(label = "已同步・剛剛") {
     const localTime = comparableTime(state.clientUpdatedAt);
     const cloudRevision = comparableRevision(cloudData?.revision || cloudState?.cloudRevision);
     const localRevision = comparableRevision(state.cloudRevision);
+    const localQuestionCount = questionCountOf(state);
+    const cloudQuestionCount = questionCountOf(cloudState);
+    const localWouldEraseCloudQuestions = cloudQuestionCount > 0 && localQuestionCount === 0;
     const cloudLooksNewer = cloudState && (
+      localWouldEraseCloudQuestions ||
       cloudRevision > localRevision ||
       (cloudRevision === localRevision && (cloudTime > localTime || (!localTime && JSON.stringify(cloudState) !== serialized)))
     );
@@ -334,9 +351,14 @@ async function saveCurrentStateToCloud(label = "已同步・剛剛") {
     setStatus(`${label}・${device.label}`);
   }
 }
-
 function scheduleCloudSave(event) {
   if (applyingCloudState || !currentUser || !db || !firebaseApi) return;
+  if (isQuestionBankPage) {
+    questionBankDirty = true;
+    setStatus("題庫有未上傳變更");
+    setQuestionBackupStatus("尚未上傳");
+    return;
+  }
   clearTimeout(saveTimer);
   if (event?.detail?.immediate) {
     saveCurrentStateToCloud().catch((error) => {
@@ -351,79 +373,6 @@ function scheduleCloudSave(event) {
       console.error("Firebase autosave failed", error);
     });
   }, 700);
-}
-
-async function loadCloudState() {
-  if (!currentUser || !db || !firebaseApi) return;
-  setStatus("正在同步…");
-  const snapshot = await firebaseApi.getDoc(cloudDocRef());
-  if (snapshot.exists() && snapshot.data()?.state) {
-    const data = snapshot.data();
-    const localState = getLocalState();
-    const localTime = comparableTime(localState?.clientUpdatedAt);
-    const cloudTime = comparableTime(data.clientUpdatedAt || data.state?.clientUpdatedAt);
-    const localRevision = comparableRevision(localState?.cloudRevision);
-    const cloudRevision = comparableRevision(data.revision || data.state?.cloudRevision);
-    if (localRevision > cloudRevision || (!localRevision && !cloudRevision && localTime > cloudTime)) {
-      lastSyncedState = "";
-      await saveCurrentStateToCloud("已同步本機變更");
-      await ensureDailyQuestionCloudBackup();
-      return;
-    }
-    if (localRevision === cloudRevision && localTime === cloudTime && JSON.stringify(localState) === JSON.stringify(data.state)) {
-      lastSyncedState = JSON.stringify(data.state);
-      setStatus(describeCloudSave(data));
-      await ensureDailyQuestionCloudBackup();
-      return;
-    }
-    writeLocalState(data.state);
-    setStatus(describeCloudSave(data));
-    await ensureDailyQuestionCloudBackup();
-    return;
-  }
-  await saveCurrentStateToCloud("已建立雲端存檔");
-  await ensureDailyQuestionCloudBackup();
-}
-
-function friendlyError(error) {
-  const messages = {
-    "auth/invalid-credential": "Email 或密碼不正確。",
-    "auth/email-already-in-use": "這個 Email 已經註冊過。",
-    "auth/invalid-email": "Email 格式不正確。",
-    "auth/weak-password": "密碼至少需要 6 個字元。",
-    "auth/too-many-requests": "嘗試次數過多，請稍後再試。"
-  };
-  return messages[error?.code] || "操作失敗，請確認網路與 Firebase 設定。";
-}
-
-function updateLoginText() {
-  if (!elements.title || !elements.description || !elements.submit || !elements.password) return;
-  elements.title.textContent = "登入雲端存檔";
-  elements.description.textContent = "登入後可將目前所有內容安全存入自己的帳號。";
-  elements.submit.textContent = "登入";
-  elements.password.autocomplete = "current-password";
-  showMessage("");
-}
-
-if (elements.form) {
-  elements.form.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    if (!firebaseApi || !auth) {
-      showMessage(configured ? "Firebase 尚未連線，請稍後再試。" : "請先完成 Firebase 專案設定。");
-      return;
-    }
-    elements.submit.disabled = true;
-    showMessage("正在登入…");
-    try {
-      await firebaseApi.signInWithEmailAndPassword(auth, elements.email.value.trim(), elements.password.value);
-      elements.form.reset();
-      elements.dialog.close();
-    } catch (error) {
-      showMessage(friendlyError(error));
-    } finally {
-      elements.submit.disabled = false;
-    }
-  });
 }
 
 if (elements.save) {
@@ -445,6 +394,57 @@ if (elements.save) {
 }
 
 if (elements.logout) elements.logout.addEventListener("click", () => { if (auth && firebaseApi) firebaseApi.signOut(auth); });
+
+if (elements.questionCloudUpload) {
+  elements.questionCloudUpload.addEventListener("click", async () => {
+    if (!currentUser || !db || !firebaseApi) return;
+    elements.questionCloudUpload.disabled = true;
+    setQuestionBackupStatus("正在上傳題庫…");
+    try {
+      lastSyncedState = "";
+      await saveCurrentStateToCloud("題庫已上傳");
+      questionBankDirty = false;
+      setQuestionBackupStatus("題庫已上傳");
+      await ensureDailyQuestionCloudBackup();
+    } catch (error) {
+      setQuestionBackupStatus("題庫上傳失敗。");
+      console.error("Question manual upload failed", error);
+    } finally {
+      setQuestionManualButtonsEnabled(Boolean(currentUser));
+    }
+  });
+}
+
+if (elements.questionCloudLoad) {
+  elements.questionCloudLoad.addEventListener("click", async () => {
+    if (!currentUser || !db || !firebaseApi) return;
+    elements.questionCloudLoad.disabled = true;
+    setQuestionBackupStatus("正在讀取雲端題庫…");
+    try {
+      await loadCloudState();
+      questionBankDirty = false;
+      setQuestionBackupStatus("已讀取雲端題庫");
+      await updateQuestionCloudBackupPanel();
+    } catch (error) {
+      setQuestionBackupStatus("讀取雲端題庫失敗。");
+      console.error("Question manual load failed", error);
+    } finally {
+      setQuestionManualButtonsEnabled(Boolean(currentUser));
+    }
+  });
+}
+
+function uploadQuestionBankBeforeLeave() {
+  if (!isQuestionBankPage || !questionBankDirty || !currentUser || !db || !firebaseApi) return;
+  questionBankDirty = false;
+  saveCurrentStateToCloud("題庫關閉前已上傳").catch((error) => {
+    questionBankDirty = true;
+    console.error("Question before-leave upload failed", error);
+  });
+}
+
+window.addEventListener("pagehide", uploadQuestionBankBeforeLeave);
+window.addEventListener("beforeunload", uploadQuestionBankBeforeLeave);
 
 if (elements.questionBackupRestore) {
   elements.questionBackupRestore.addEventListener("click", async () => {
@@ -492,6 +492,7 @@ async function initializeFirebase() {
       if (elements.open) elements.open.hidden = Boolean(user);
       if (elements.save) elements.save.hidden = !user;
       if (elements.logout) elements.logout.hidden = !user;
+      setQuestionManualButtonsEnabled(Boolean(user));
       setStatus(user ? user.email : "尚未登入");
       clearTimeout(saveTimer);
       clearTimeout(questionBackupTimer);
@@ -505,6 +506,13 @@ async function initializeFirebase() {
       window.addEventListener("planner:state-saved", scheduleCloudSave);
       unsubscribeSave = scheduleCloudSave;
       try {
+        if (isQuestionBankPage) {
+          lastSyncedState = JSON.stringify(getLocalState());
+          setStatus("題庫同步：請手動上傳或讀取");
+          await updateQuestionCloudBackupPanel();
+          scheduleMidnightQuestionBackup();
+          return;
+        }
         await loadCloudState();
         await updateQuestionCloudBackupPanel();
         scheduleMidnightQuestionBackup();
